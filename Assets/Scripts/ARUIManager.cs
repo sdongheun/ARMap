@@ -1,0 +1,376 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+public class ARUIManager : MonoBehaviour
+{
+    // --- Inspector Variables ---
+    [Header("1. Main Cards (1~3)")]
+    public GameObject scanningCard;
+    public GameObject detectedCard;
+    public GameObject quickInfoCard;
+
+    [Header("2. Quick Info Content")]
+    public Image quickInfoIcon;
+    public TextMeshProUGUI quickTitleText;    
+    public TextMeshProUGUI quickCategoryText; 
+    public TextMeshProUGUI quickAddressText;  
+    
+    [Header("3. Main Buttons")]
+    public Button actionButton;
+    public TextMeshProUGUI actionButtonText; 
+    public Button openDetailButton;
+
+    [Header("4. Icons")]
+    public Sprite iconScanning;
+    public Sprite iconDetected;
+    public Sprite iconBuilding;
+
+    [Header("5. Detail View (Page 4)")]
+    public GameObject detailViewObject;
+    public RectTransform detailPanelRect;
+    public ScrollRect detailScrollView;
+    
+    public TextMeshProUGUI detailTitle;
+    public TextMeshProUGUI detailCategory;
+    public TextMeshProUGUI detailAddress;
+    public TextMeshProUGUI detailZipCode;
+    public TextMeshProUGUI detailPhone;
+    
+    [Header("6. Detail View Buttons")]
+    public Button closeDetailButton;
+    public Button copyAddressButton;
+    public Button callPhoneButton;
+    public Button openMapButton;
+
+    [Header("7. Facility List (Dynamic)")]
+    public GameObject facilityItemPrefab;
+    public Transform facilityContainer;
+
+    [Header("8. Animation Settings")]
+    public float animDuration = 0.3f; 
+    public float slideOffset = 150f; 
+    public float statusCardPosY = 0f;    
+    public float quickCardPosY = -50f;   
+
+    [Header("9. Toast Message")]
+    public GameObject toastPanel;
+    public TextMeshProUGUI toastText;
+    public float toastDuration = 2.0f;
+    private Coroutine _toastRoutine;
+
+    // --- Internal Variables ---
+    public event Action OnClickAction; 
+    public event Action OnClickDetail; 
+    private enum UIState { None, Scanning, Detected, QuickInfo }
+    private UIState currentState = UIState.None;
+    private BuildingData _currentDetailData;
+    private BuildingData _originalDetailData;
+    private Coroutine _detailRoutine;
+    private float _hiddenY; 
+
+    private RectTransform _scanRect, _detectRect, _quickRect;
+    private CanvasGroup _scanGroup, _detectGroup, _quickGroup;
+    private Coroutine _scanRoutine, _detectRoutine, _quickRoutine;
+
+    void Awake()
+    {
+        _scanRect = scanningCard.GetComponent<RectTransform>(); _scanGroup = scanningCard.GetComponent<CanvasGroup>();
+        _detectRect = detectedCard.GetComponent<RectTransform>(); _detectGroup = detectedCard.GetComponent<CanvasGroup>();
+        _quickRect = quickInfoCard.GetComponent<RectTransform>(); _quickGroup = quickInfoCard.GetComponent<CanvasGroup>();
+    }
+
+    void Start()
+    {
+        actionButton.onClick.AddListener(() => OnClickAction?.Invoke());
+        openDetailButton.onClick.AddListener(() => OnClickDetail?.Invoke());
+
+        if (closeDetailButton != null) closeDetailButton.onClick.AddListener(CloseDetailView);
+        if (copyAddressButton != null) copyAddressButton.onClick.AddListener(OnCopyAddress);
+        if (callPhoneButton != null) callPhoneButton.onClick.AddListener(OnCallPhone);
+        if (openMapButton != null) openMapButton.onClick.AddListener(OnOpenMap);
+
+        InitializeCard(_scanRect, _scanGroup, true, statusCardPosY);
+        InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
+        InitializeCard(_quickRect, _quickGroup, false, quickCardPosY);
+
+        if (detailViewObject != null) detailViewObject.SetActive(false);
+        
+        if (detailPanelRect != null) _hiddenY = -2500f; 
+    }
+
+    #region Main Card State Control
+    // 화면 상태 전환 (1번: 스캔 중)
+    public void SetScanningMode()
+    {
+        if (currentState == UIState.Scanning) return;
+        currentState = UIState.Scanning;
+        actionButton.interactable = false; 
+        actionButtonText.text = "건물 정보 보기";
+        ShowCard(scanningCard, _scanRect, _scanGroup, statusCardPosY, ref _scanRoutine);
+        HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
+        HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
+    }
+
+    // 화면 상태 전환 (2번: 건물 감지됨)
+    public void SetDetectedMode()
+    {
+        if (currentState == UIState.QuickInfo || currentState == UIState.Detected) return;
+        currentState = UIState.Detected;
+        actionButton.interactable = true; 
+        actionButtonText.text = "건물 정보 보기";
+        HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
+        ShowCard(detectedCard, _detectRect, _detectGroup, statusCardPosY, ref _detectRoutine);
+        HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
+    }
+
+    // 화면 상태 전환 (3번: 요약 정보 표시)
+    public void ShowQuickInfo(BuildingData data)
+    {
+        if (currentState == UIState.QuickInfo) return;
+        currentState = UIState.QuickInfo;
+        if (quickInfoIcon != null) quickInfoIcon.sprite = iconBuilding;
+        quickTitleText.text = data.buildingName;
+        quickCategoryText.text = string.IsNullOrEmpty(data.description) ? "장소 정보" : data.description;
+        quickAddressText.text = data.fetchedAddress;
+        actionButton.interactable = true;
+        actionButtonText.text = "다른 건물 인식";
+        HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
+        HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
+        ShowCard(quickInfoCard, _quickRect, _quickGroup, quickCardPosY, ref _quickRoutine);
+    }
+    #endregion
+
+    #region Detail View Control
+    // 상세 페이지 열기 및 데이터 채우기
+    public void OpenDetailView(BuildingData data)
+    {
+        _currentDetailData = data;
+        _originalDetailData = data;
+
+        detailTitle.text = data.buildingName;
+        detailCategory.text = string.IsNullOrEmpty(data.description) ? "상업 시설" : data.description;
+        detailAddress.text = data.fetchedAddress;
+        
+        if (detailZipCode != null)
+        {
+            if (string.IsNullOrEmpty(data.zipCode))
+            {
+                detailZipCode.text = "";
+                detailZipCode.gameObject.SetActive(false);
+            }
+            else
+            {
+                detailZipCode.text = "지번: " + data.zipCode; 
+                detailZipCode.gameObject.SetActive(true);
+            }
+        }
+
+        if (string.IsNullOrEmpty(data.phoneNumber)) {
+            detailPhone.text = "전화번호 없음";
+            callPhoneButton.interactable = false;
+        } else {
+            detailPhone.text = data.phoneNumber;
+            callPhoneButton.interactable = true;
+        }
+
+        UpdateFacilityList(data.facilities);
+
+        detailViewObject.SetActive(true);
+        if (detailScrollView != null) detailScrollView.verticalNormalizedPosition = 1f;
+        
+        if (_detailRoutine != null) StopCoroutine(_detailRoutine);
+        _detailRoutine = StartCoroutine(AnimateDetailPanel(_hiddenY, 0f));
+    }
+
+    // 상세 페이지 닫기
+    public void CloseDetailView()
+    {
+        if (_detailRoutine != null) StopCoroutine(_detailRoutine);
+        _detailRoutine = StartCoroutine(AnimateDetailPanel(0f, _hiddenY, () => { detailViewObject.SetActive(false); }));
+    }
+
+    // 입점 상가 리스트 동적 생성
+    void UpdateFacilityList(List<FacilityInfo> facilities)
+    {
+        foreach (Transform child in facilityContainer)
+        {
+            if (child.name == "Header") continue;
+            Destroy(child.gameObject);
+        }
+        foreach (var info in facilities)
+        {
+            GameObject item = Instantiate(facilityItemPrefab, facilityContainer);
+            
+            Vector3 pos = item.transform.localPosition;
+            pos.z = 0;
+            item.transform.localPosition = pos;
+
+            TextMeshProUGUI nameTxt = item.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
+            TextMeshProUGUI phoneTxt = item.transform.Find("PhoneText")?.GetComponent<TextMeshProUGUI>();
+
+            if (nameTxt != null) nameTxt.text = info.name;
+            if (phoneTxt != null) phoneTxt.text = string.IsNullOrEmpty(info.phone) ? "" : info.phone;
+
+            Button btn = item.GetComponent<Button>();
+            if (btn != null)
+            {
+                btn.onClick.AddListener(() => SelectFacility(info));
+            }
+        }
+    }
+
+    // 입점 상가 선택 시 정보 교체
+    void SelectFacility(FacilityInfo facility)
+    {
+        if (_originalDetailData == null) return;
+
+        BuildingData facilityData = new BuildingData();
+        
+        facilityData.buildingName = facility.name;
+        facilityData.phoneNumber = facility.phone;
+        facilityData.fetchedAddress = _originalDetailData.fetchedAddress;
+        facilityData.zipCode = _originalDetailData.zipCode;  
+        facilityData.facilities = _originalDetailData.facilities; 
+
+        if (string.IsNullOrEmpty(facility.placeUrl))
+            facilityData.placeUrl = _originalDetailData.placeUrl; 
+        else
+            facilityData.placeUrl = facility.placeUrl; 
+
+        if (string.IsNullOrEmpty(facility.category))
+            facilityData.description = "입점 시설";
+        else
+            facilityData.description = facility.category;
+
+        _currentDetailData = facilityData;
+
+        if (quickTitleText != null) quickTitleText.text = facilityData.buildingName;
+        if (quickCategoryText != null) quickCategoryText.text = facilityData.description;
+
+        if (detailTitle != null) detailTitle.text = facilityData.buildingName;
+        if (detailCategory != null) detailCategory.text = facilityData.description;
+        
+        if (string.IsNullOrEmpty(facilityData.phoneNumber)) {
+            if (detailPhone != null) detailPhone.text = "전화번호 없음";
+            if (callPhoneButton != null) callPhoneButton.interactable = false;
+        } else {
+            if (detailPhone != null) detailPhone.text = facilityData.phoneNumber;
+            if (callPhoneButton != null) callPhoneButton.interactable = true;
+        }
+
+        if (detailScrollView != null) detailScrollView.verticalNormalizedPosition = 1f;
+        
+        Debug.Log($"[시설 선택] {facility.name} 정보로 전환됨");
+    }
+
+    // 원본 건물 정보로 복구
+    public void RestoreOriginalView()
+    {
+        if (_originalDetailData == null) return;
+
+        _currentDetailData = _originalDetailData; 
+
+        if (quickTitleText != null) quickTitleText.text = _originalDetailData.buildingName;
+        if (quickCategoryText != null) quickCategoryText.text = _originalDetailData.description; 
+
+        if (detailTitle != null) detailTitle.text = _originalDetailData.buildingName;
+        if (detailCategory != null) detailCategory.text = string.IsNullOrEmpty(_originalDetailData.description) ? "상업 시설" : _originalDetailData.description;
+        
+        if (string.IsNullOrEmpty(_originalDetailData.phoneNumber)) {
+            if (detailPhone != null) detailPhone.text = "전화번호 없음";
+            if (callPhoneButton != null) callPhoneButton.interactable = false;
+        } else {
+            if (detailPhone != null) detailPhone.text = _originalDetailData.phoneNumber;
+            if (callPhoneButton != null) callPhoneButton.interactable = true;
+        }
+        
+        Debug.Log("원본 건물 정보로 복구되었습니다.");
+    }
+    #endregion
+
+    #region UI Utilities (Toast & Buttons)
+    // 토스트 메시지 표시
+    public void ShowToast(string message)
+    {
+        if (_toastRoutine != null) StopCoroutine(_toastRoutine);
+        _toastRoutine = StartCoroutine(ToastProcess(message));
+    }
+
+    IEnumerator ToastProcess(string message)
+    {
+        if (toastText != null) toastText.text = message;
+        toastPanel.SetActive(true);
+        CanvasGroup group = toastPanel.GetComponent<CanvasGroup>();
+        group.alpha = 0f;
+
+        float time = 0f;
+        while (time < 0.2f)
+        {
+            time += Time.deltaTime;
+            group.alpha = Mathf.Lerp(0f, 1f, time / 0.2f);
+            yield return null;
+        }
+        group.alpha = 1f;
+
+        yield return new WaitForSeconds(toastDuration);
+
+        time = 0f;
+        while (time < 0.3f)
+        {
+            time += Time.deltaTime;
+            group.alpha = Mathf.Lerp(1f, 0f, time / 0.3f);
+            yield return null;
+        }
+        toastPanel.SetActive(false);
+    }
+
+    void OnCopyAddress()
+    {
+        if (_currentDetailData != null)
+        {
+            GUIUtility.systemCopyBuffer = _currentDetailData.fetchedAddress;
+            ShowToast("주소가 복사되었습니다.");
+        }
+    }
+
+    void OnCallPhone() { if (_currentDetailData != null && !string.IsNullOrEmpty(_currentDetailData.phoneNumber)) Application.OpenURL("tel:" + _currentDetailData.phoneNumber); }
+    void OnOpenMap() { if (_currentDetailData != null && !string.IsNullOrEmpty(_currentDetailData.placeUrl)) Application.OpenURL(_currentDetailData.placeUrl); }
+    #endregion
+
+    #region Animations
+    IEnumerator AnimateDetailPanel(float startY, float targetY, Action onComplete = null)
+    {
+        float time = 0f;
+        float duration = 0.5f; 
+        
+        Vector2 pos = detailPanelRect.anchoredPosition;
+        pos.y = startY;
+        detailPanelRect.anchoredPosition = pos;
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = time / duration;
+            t = t * t * (3f - 2f * t); 
+
+            pos.y = Mathf.Lerp(startY, targetY, t);
+            detailPanelRect.anchoredPosition = pos;
+            yield return null;
+        }
+        
+        pos.y = targetY;
+        detailPanelRect.anchoredPosition = pos;
+        onComplete?.Invoke();
+    }
+
+    void ShowCard(GameObject obj, RectTransform rect, CanvasGroup group, float targetY, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); obj.SetActive(true); routine = StartCoroutine(AnimateMove(rect, group, targetY, 1)); }
+    void HideCard(GameObject obj, RectTransform rect, CanvasGroup group, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); routine = StartCoroutine(AnimateMove(rect, group, slideOffset, 0, () => obj.SetActive(false))); }
+    void InitializeCard(RectTransform rect, CanvasGroup group, bool visible, float targetY) { if (visible) { rect.anchoredPosition = new Vector2(0, targetY); group.alpha = 1; } else { rect.anchoredPosition = new Vector2(0, slideOffset); group.alpha = 0; } }
+    
+    IEnumerator AnimateMove(RectTransform rect, CanvasGroup group, float targetY, float targetAlpha, Action onComplete = null) { float startY = rect.anchoredPosition.y; float startAlpha = group.alpha; float time = 0; while (time < animDuration) { time += Time.deltaTime; float t = time / animDuration; t = t * t * (3f - 2f * t); Vector2 pos = rect.anchoredPosition; pos.y = Mathf.Lerp(startY, targetY, t); rect.anchoredPosition = pos; group.alpha = Mathf.Lerp(startAlpha, targetAlpha, t); yield return null; } rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, targetY); group.alpha = targetAlpha; onComplete?.Invoke(); }
+    #endregion
+}
