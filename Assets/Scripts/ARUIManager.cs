@@ -7,6 +7,23 @@ using System.Collections.Generic;
 
 public class ARUIManager : MonoBehaviour
 {
+    [Serializable]
+    public class ScreenMarkerData
+    {
+        public string id;
+        public string label;
+        public Vector2 screenPosition;
+        public bool isSelected;
+    }
+
+    private class ScreenMarkerView
+    {
+        public GameObject root;
+        public RectTransform rectTransform;
+        public TextMeshProUGUI dotText;
+        public TextMeshProUGUI labelText;
+    }
+
     // --- Inspector Variables ---
     [Header("1. Main Cards (1~3)")]
     public GameObject scanningCard;
@@ -63,7 +80,6 @@ public class ARUIManager : MonoBehaviour
     private Coroutine _toastRoutine;
 
     // --- Internal Variables ---
-    public event Action OnClickAction; 
     public event Action OnClickDetail; 
     private enum UIState { None, Scanning, Detected, QuickInfo }
     private UIState currentState = UIState.None;
@@ -75,18 +91,26 @@ public class ARUIManager : MonoBehaviour
     private RectTransform _scanRect, _detectRect, _quickRect;
     private CanvasGroup _scanGroup, _detectGroup, _quickGroup;
     private Coroutine _scanRoutine, _detectRoutine, _quickRoutine;
+    private RectTransform _canvasRect;
+    private Canvas _canvas;
+    private RectTransform _screenMarkerRoot;
+    private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
 
     void Awake()
     {
         _scanRect = scanningCard.GetComponent<RectTransform>(); _scanGroup = scanningCard.GetComponent<CanvasGroup>();
         _detectRect = detectedCard.GetComponent<RectTransform>(); _detectGroup = detectedCard.GetComponent<CanvasGroup>();
         _quickRect = quickInfoCard.GetComponent<RectTransform>(); _quickGroup = quickInfoCard.GetComponent<CanvasGroup>();
+        _canvasRect = GetComponent<RectTransform>();
+        _canvas = GetComponent<Canvas>();
     }
 
     void Start()
     {
-        actionButton.onClick.AddListener(() => OnClickAction?.Invoke());
-        openDetailButton.onClick.AddListener(() => OnClickDetail?.Invoke());
+        if (openDetailButton != null)
+        {
+            openDetailButton.onClick.AddListener(() => OnClickDetail?.Invoke());
+        }
 
         if (closeDetailButton != null) closeDetailButton.onClick.AddListener(CloseDetailView);
         if (copyAddressButton != null) copyAddressButton.onClick.AddListener(OnCopyAddress);
@@ -99,7 +123,10 @@ public class ARUIManager : MonoBehaviour
 
         if (detailViewObject != null) detailViewObject.SetActive(false);
         
-        if (detailPanelRect != null) _hiddenY = -2500f; 
+        if (detailPanelRect != null) _hiddenY = -2500f;
+
+        EnsureScreenMarkerRoot();
+        SetPrimaryButtonsVisible(false);
     }
 
     #region Main Card State Control
@@ -108,8 +135,7 @@ public class ARUIManager : MonoBehaviour
     {
         if (currentState == UIState.Scanning) return;
         currentState = UIState.Scanning;
-        actionButton.interactable = false; 
-        actionButtonText.text = "건물 정보 보기";
+        SetPrimaryButtonsVisible(false);
         ShowCard(scanningCard, _scanRect, _scanGroup, statusCardPosY, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
         HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
@@ -120,8 +146,7 @@ public class ARUIManager : MonoBehaviour
     {
         if (currentState == UIState.QuickInfo || currentState == UIState.Detected) return;
         currentState = UIState.Detected;
-        actionButton.interactable = true; 
-        actionButtonText.text = "건물 정보 보기";
+        SetPrimaryButtonsVisible(false);
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         ShowCard(detectedCard, _detectRect, _detectGroup, statusCardPosY, ref _detectRoutine);
         HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
@@ -136,13 +161,148 @@ public class ARUIManager : MonoBehaviour
         quickTitleText.text = data.buildingName;
         quickCategoryText.text = string.IsNullOrEmpty(data.description) ? "장소 정보" : data.description;
         quickAddressText.text = data.fetchedAddress;
-        actionButton.interactable = true;
-        actionButtonText.text = "다른 건물 인식";
+        SetPrimaryButtonsVisible(true);
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
         ShowCard(quickInfoCard, _quickRect, _quickGroup, quickCardPosY, ref _quickRoutine);
     }
     #endregion
+
+    void SetPrimaryButtonsVisible(bool visible)
+    {
+        if (openDetailButton != null)
+        {
+            openDetailButton.gameObject.SetActive(visible);
+        }
+    }
+
+    public void UpdateScreenMarkers(List<ScreenMarkerData> markerDataList)
+    {
+        EnsureScreenMarkerRoot();
+
+        HashSet<string> activeIds = new HashSet<string>();
+        foreach (ScreenMarkerData data in markerDataList)
+        {
+            if (data == null || string.IsNullOrWhiteSpace(data.id)) continue;
+
+            activeIds.Add(data.id);
+            ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
+            view.root.SetActive(true);
+            view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
+            view.dotText.text = "●";
+            view.dotText.fontSize = data.isSelected ? 72 : 54;
+            view.dotText.color = data.isSelected ? new Color(1.0f, 0.32f, 0.12f, 1f) : new Color(0.08f, 0.95f, 1.0f, 1f);
+            view.labelText.text = data.label;
+            view.labelText.color = data.isSelected ? Color.white : new Color(0.88f, 0.97f, 1.0f, 1f);
+            view.labelText.fontSize = data.isSelected ? 24 : 20;
+        }
+
+        foreach (var pair in _screenMarkerViews)
+        {
+            if (pair.Value?.root != null)
+            {
+                pair.Value.root.SetActive(activeIds.Contains(pair.Key));
+            }
+        }
+    }
+
+    public void ClearScreenMarkers()
+    {
+        foreach (var pair in _screenMarkerViews)
+        {
+            if (pair.Value?.root != null)
+            {
+                pair.Value.root.SetActive(false);
+            }
+        }
+    }
+
+    void EnsureScreenMarkerRoot()
+    {
+        if (_screenMarkerRoot != null) return;
+
+        GameObject rootObject = new GameObject("ScreenMarkerRoot", typeof(RectTransform));
+        rootObject.transform.SetParent(transform, false);
+        _screenMarkerRoot = rootObject.GetComponent<RectTransform>();
+        _screenMarkerRoot.anchorMin = Vector2.zero;
+        _screenMarkerRoot.anchorMax = Vector2.one;
+        _screenMarkerRoot.offsetMin = Vector2.zero;
+        _screenMarkerRoot.offsetMax = Vector2.zero;
+        _screenMarkerRoot.SetAsLastSibling();
+    }
+
+    ScreenMarkerView GetOrCreateScreenMarkerView(string id)
+    {
+        if (_screenMarkerViews.TryGetValue(id, out ScreenMarkerView existingView) && existingView?.root != null)
+        {
+            return existingView;
+        }
+
+        GameObject rootObject = new GameObject($"ScreenMarker_{id}", typeof(RectTransform));
+        rootObject.transform.SetParent(_screenMarkerRoot, false);
+
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0.5f, 0.5f);
+        rootRect.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.sizeDelta = new Vector2(220f, 96f);
+
+        TextMeshProUGUI dotText = CreateScreenMarkerText("Dot", rootObject.transform, 0f, 10f, 80f, 80f, TextAlignmentOptions.Center);
+        TextMeshProUGUI labelText = CreateScreenMarkerText("Label", rootObject.transform, 0f, -28f, 220f, 36f, TextAlignmentOptions.Center);
+        labelText.enableWordWrapping = false;
+        labelText.overflowMode = TextOverflowModes.Ellipsis;
+
+        ScreenMarkerView view = new ScreenMarkerView
+        {
+            root = rootObject,
+            rectTransform = rootRect,
+            dotText = dotText,
+            labelText = labelText
+        };
+
+        _screenMarkerViews[id] = view;
+        return view;
+    }
+
+    TextMeshProUGUI CreateScreenMarkerText(string name, Transform parent, float posX, float posY, float width, float height, TextAlignmentOptions alignment)
+    {
+        GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(parent, false);
+
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(posX, posY);
+        rect.sizeDelta = new Vector2(width, height);
+
+        TextMeshProUGUI tmp = textObject.GetComponent<TextMeshProUGUI>();
+        tmp.alignment = alignment;
+        tmp.raycastTarget = false;
+        tmp.fontStyle = FontStyles.Bold;
+        if (quickTitleText != null)
+        {
+            tmp.font = quickTitleText.font;
+            tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
+        }
+        return tmp;
+    }
+
+    Vector2 ClampToCanvas(Vector2 screenPosition)
+    {
+        Vector2 localPoint;
+        Camera uiCamera = _canvas != null && _canvas.renderMode != RenderMode.ScreenSpaceOverlay ? _canvas.worldCamera : null;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screenPosition, uiCamera, out localPoint);
+
+        const float paddingX = 120f;
+        const float paddingY = 160f;
+        float halfWidth = _canvasRect.rect.width * 0.5f;
+        float halfHeight = _canvasRect.rect.height * 0.5f;
+
+        localPoint.x = Mathf.Clamp(localPoint.x, -halfWidth + paddingX, halfWidth - paddingX);
+        localPoint.y = Mathf.Clamp(localPoint.y, -halfHeight + paddingY, halfHeight - paddingY);
+        return localPoint;
+    }
 
     #region Detail View Control
     // 상세 페이지 열기 및 데이터 채우기

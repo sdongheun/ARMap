@@ -1,14 +1,15 @@
 {
   "dependencies": {
     "com.google.ar.core.arfoundation.extensions": {
-      "version": "file:/Users/song-yong-gyun/Downloads/arcore-unity-extensions-arf6.tgz",
+      "version": "https://github.com/google-ar/arcore-unity-extensions.git#arf6",
       "depth": 0,
-      "source": "local-tarball",
+      "source": "git",
       "dependencies": {
         "com.unity.xr.arfoundation": "4.1.5",
         "com.unity.xr.arcore": "4.1.5",
         "com.unity.xr.arkit": "4.1.5"
-      }
+      },
+      "hash": "8592f61899f63d37930d9139f276cac061da453a"
     },
     "com.unity.2d.common": {
       "version": "11.0.1",
