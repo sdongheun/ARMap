@@ -28,9 +28,12 @@ public class BuildingMarker : MonoBehaviour
     private SpriteRenderer[] _spriteRenderers;
     private Transform _infoLabelRoot;
     private RectTransform _infoLabelRect;
+    private CanvasGroup _infoCanvasGroup;
     private Image _infoBackground;
     private TextMeshProUGUI _titleText;
     private TextMeshProUGUI _subtitleText;
+    private bool _infoVisibleTarget;
+    private float _infoVisibilityLerp;
 
     void Start()
     {
@@ -56,6 +59,7 @@ public class BuildingMarker : MonoBehaviour
         }
 
         transform.localScale = Vector3.Lerp(transform.localScale, _targetScaleVec, Time.deltaTime * animSpeed);
+        UpdateInfoLabelVisual();
     }
 
     public void SetState(MarkerVisualState state, bool immediate = false)
@@ -129,7 +133,31 @@ public class BuildingMarker : MonoBehaviour
 
         if (_infoLabelRoot != null)
         {
-            _infoLabelRoot.gameObject.SetActive(visible);
+            _infoVisibleTarget = visible;
+            if (visible)
+            {
+                _infoLabelRoot.gameObject.SetActive(true);
+            }
+        }
+    }
+
+    void UpdateInfoLabelVisual()
+    {
+        if (_infoLabelRoot == null || _infoCanvasGroup == null)
+        {
+            return;
+        }
+
+        float targetVisibility = _infoVisibleTarget ? 1f : 0f;
+        _infoVisibilityLerp = Mathf.Lerp(_infoVisibilityLerp, targetVisibility, Time.deltaTime * animSpeed);
+        _infoCanvasGroup.alpha = _infoVisibilityLerp;
+
+        float scale = Mathf.Lerp(0.72f, 1f, _infoVisibilityLerp) * 0.01f;
+        _infoLabelRoot.localScale = Vector3.one * scale;
+
+        if (!_infoVisibleTarget && _infoVisibilityLerp <= 0.02f)
+        {
+            _infoLabelRoot.gameObject.SetActive(false);
         }
     }
 
@@ -140,16 +168,19 @@ public class BuildingMarker : MonoBehaviour
             return;
         }
 
-        GameObject labelRoot = new GameObject("InfoLabelRoot", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
+        GameObject labelRoot = new GameObject("InfoLabelRoot", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster), typeof(CanvasGroup));
         _infoLabelRoot = labelRoot.transform;
         _infoLabelRoot.SetParent(transform, false);
         _infoLabelRoot.localPosition = infoLabelOffset;
         _infoLabelRoot.localRotation = Quaternion.identity;
-        _infoLabelRoot.localScale = Vector3.one * 0.01f;
+        _infoLabelRoot.localScale = Vector3.one * 0.0072f;
 
         Canvas canvas = labelRoot.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
         canvas.sortingOrder = 500;
+        _infoCanvasGroup = labelRoot.GetComponent<CanvasGroup>();
+        _infoCanvasGroup.alpha = 0f;
+        _infoVisibilityLerp = 0f;
 
         _infoLabelRect = labelRoot.GetComponent<RectTransform>();
         _infoLabelRect.sizeDelta = infoLabelCanvasSize;
@@ -163,7 +194,7 @@ public class BuildingMarker : MonoBehaviour
         backgroundRect.offsetMax = Vector2.zero;
 
         _infoBackground = backgroundObject.GetComponent<Image>();
-        _infoBackground.color = new Color(0.03f, 0.06f, 0.1f, 0.82f);
+        _infoBackground.color = new Color(0.03f, 0.06f, 0.1f, 0.9f);
 
         _titleText = CreateText("Title", backgroundObject.transform, -18f, 30f, 1.0f, 26f, FontStyles.Bold);
         _subtitleText = CreateText("Subtitle", backgroundObject.transform, -48f, 24f, 0.82f, 18f, FontStyles.Normal);

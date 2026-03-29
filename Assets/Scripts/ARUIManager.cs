@@ -12,6 +12,7 @@ public class ARUIManager : MonoBehaviour
     {
         public string id;
         public string label;
+        public string subtitle;
         public Vector2 screenPosition;
         public bool isSelected;
     }
@@ -20,8 +21,11 @@ public class ARUIManager : MonoBehaviour
     {
         public GameObject root;
         public RectTransform rectTransform;
-        public TextMeshProUGUI dotText;
-        public TextMeshProUGUI labelText;
+        public TextMeshProUGUI pinHeadText;
+        public TextMeshProUGUI pinTailText;
+        public Image labelBackground;
+        public TextMeshProUGUI titleText;
+        public TextMeshProUGUI subtitleText;
     }
 
     // --- Inspector Variables ---
@@ -80,7 +84,9 @@ public class ARUIManager : MonoBehaviour
     private Coroutine _toastRoutine;
 
     // --- Internal Variables ---
-    public event Action OnClickDetail; 
+    public event Action OnClickDetail;
+    public event Action OnDetailOpened;
+    public event Action OnDetailClosed;
     private enum UIState { None, Scanning, Detected, QuickInfo }
     private UIState currentState = UIState.None;
     private BuildingData _currentDetailData;
@@ -144,7 +150,7 @@ public class ARUIManager : MonoBehaviour
     // 화면 상태 전환 (2번: 건물 감지됨)
     public void SetDetectedMode()
     {
-        if (currentState == UIState.QuickInfo || currentState == UIState.Detected) return;
+        if (currentState == UIState.Detected) return;
         currentState = UIState.Detected;
         SetPrimaryButtonsVisible(false);
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
@@ -155,7 +161,6 @@ public class ARUIManager : MonoBehaviour
     // 화면 상태 전환 (3번: 요약 정보 표시)
     public void ShowQuickInfo(BuildingData data)
     {
-        if (currentState == UIState.QuickInfo) return;
         currentState = UIState.QuickInfo;
         if (quickInfoIcon != null) quickInfoIcon.sprite = iconBuilding;
         quickTitleText.text = data.buildingName;
@@ -189,12 +194,21 @@ public class ARUIManager : MonoBehaviour
             ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
             view.root.SetActive(true);
             view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
-            view.dotText.text = "●";
-            view.dotText.fontSize = data.isSelected ? 72 : 54;
-            view.dotText.color = data.isSelected ? new Color(1.0f, 0.32f, 0.12f, 1f) : new Color(0.08f, 0.95f, 1.0f, 1f);
-            view.labelText.text = data.label;
-            view.labelText.color = data.isSelected ? Color.white : new Color(0.88f, 0.97f, 1.0f, 1f);
-            view.labelText.fontSize = data.isSelected ? 24 : 20;
+            view.pinHeadText.text = "●";
+            view.pinTailText.text = "▼";
+            view.pinHeadText.fontSize = data.isSelected ? 56 : 44;
+            view.pinTailText.fontSize = data.isSelected ? 46 : 36;
+
+            Color markerColor = data.isSelected ? new Color(1.0f, 0.35f, 0.16f, 1f) : new Color(0.05f, 0.78f, 0.96f, 1f);
+            view.pinHeadText.color = markerColor;
+            view.pinTailText.color = markerColor;
+
+            bool showExpandedLabel = data.isSelected;
+            view.labelBackground.gameObject.SetActive(showExpandedLabel);
+            view.titleText.gameObject.SetActive(showExpandedLabel);
+            view.subtitleText.gameObject.SetActive(showExpandedLabel);
+            view.titleText.text = data.label;
+            view.subtitleText.text = data.subtitle ?? string.Empty;
         }
 
         foreach (var pair in _screenMarkerViews)
@@ -245,19 +259,35 @@ public class ARUIManager : MonoBehaviour
         rootRect.anchorMin = new Vector2(0.5f, 0.5f);
         rootRect.anchorMax = new Vector2(0.5f, 0.5f);
         rootRect.pivot = new Vector2(0.5f, 0.5f);
-        rootRect.sizeDelta = new Vector2(220f, 96f);
+        rootRect.sizeDelta = new Vector2(260f, 120f);
 
-        TextMeshProUGUI dotText = CreateScreenMarkerText("Dot", rootObject.transform, 0f, 10f, 80f, 80f, TextAlignmentOptions.Center);
-        TextMeshProUGUI labelText = CreateScreenMarkerText("Label", rootObject.transform, 0f, -28f, 220f, 36f, TextAlignmentOptions.Center);
-        labelText.enableWordWrapping = false;
-        labelText.overflowMode = TextOverflowModes.Ellipsis;
+        TextMeshProUGUI headText = CreateScreenMarkerText("PinHead", rootObject.transform, 0f, 8f, 72f, 72f, TextAlignmentOptions.Center);
+        TextMeshProUGUI tailText = CreateScreenMarkerText("PinTail", rootObject.transform, 0f, -18f, 72f, 48f, TextAlignmentOptions.Center);
+
+        Image labelBackground = CreateScreenMarkerBackground(rootObject.transform, 0f, -54f, 240f, 58f);
+        TextMeshProUGUI titleText = CreateScreenMarkerText("Title", labelBackground.transform, 0f, 10f, 208f, 24f, TextAlignmentOptions.Center);
+        TextMeshProUGUI subtitleText = CreateScreenMarkerText("Subtitle", labelBackground.transform, 0f, -12f, 208f, 20f, TextAlignmentOptions.Center);
+        titleText.fontSize = 22f;
+        subtitleText.fontSize = 16f;
+        titleText.color = Color.white;
+        subtitleText.color = new Color(0.86f, 0.93f, 1f, 0.95f);
+        titleText.enableWordWrapping = false;
+        titleText.overflowMode = TextOverflowModes.Ellipsis;
+        subtitleText.enableWordWrapping = false;
+        subtitleText.overflowMode = TextOverflowModes.Ellipsis;
+        labelBackground.gameObject.SetActive(false);
+        titleText.gameObject.SetActive(false);
+        subtitleText.gameObject.SetActive(false);
 
         ScreenMarkerView view = new ScreenMarkerView
         {
             root = rootObject,
             rectTransform = rootRect,
-            dotText = dotText,
-            labelText = labelText
+            pinHeadText = headText,
+            pinTailText = tailText,
+            labelBackground = labelBackground,
+            titleText = titleText,
+            subtitleText = subtitleText
         };
 
         _screenMarkerViews[id] = view;
@@ -286,6 +316,23 @@ public class ARUIManager : MonoBehaviour
             tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
         }
         return tmp;
+    }
+
+    Image CreateScreenMarkerBackground(Transform parent, float posX, float posY, float width, float height)
+    {
+        GameObject backgroundObject = new GameObject("LabelBackground", typeof(RectTransform), typeof(Image));
+        backgroundObject.transform.SetParent(parent, false);
+
+        RectTransform rect = backgroundObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(posX, posY);
+        rect.sizeDelta = new Vector2(width, height);
+
+        Image image = backgroundObject.GetComponent<Image>();
+        image.color = new Color(0.04f, 0.08f, 0.14f, 0.92f);
+        return image;
     }
 
     Vector2 ClampToCanvas(Vector2 screenPosition)
@@ -341,6 +388,7 @@ public class ARUIManager : MonoBehaviour
 
         detailViewObject.SetActive(true);
         if (detailScrollView != null) detailScrollView.verticalNormalizedPosition = 1f;
+        OnDetailOpened?.Invoke();
         
         if (_detailRoutine != null) StopCoroutine(_detailRoutine);
         _detailRoutine = StartCoroutine(AnimateDetailPanel(_hiddenY, 0f));
@@ -350,7 +398,25 @@ public class ARUIManager : MonoBehaviour
     public void CloseDetailView()
     {
         if (_detailRoutine != null) StopCoroutine(_detailRoutine);
-        _detailRoutine = StartCoroutine(AnimateDetailPanel(0f, _hiddenY, () => { detailViewObject.SetActive(false); }));
+
+        if (detailPanelRect == null)
+        {
+            FinalizeDetailClose();
+            return;
+        }
+
+        float startY = detailPanelRect.anchoredPosition.y;
+        _detailRoutine = StartCoroutine(AnimateDetailPanel(startY, _hiddenY, FinalizeDetailClose));
+    }
+
+    void FinalizeDetailClose()
+    {
+        if (detailViewObject != null)
+        {
+            detailViewObject.SetActive(false);
+        }
+
+        OnDetailClosed?.Invoke();
     }
 
     // 입점 상가 리스트 동적 생성
