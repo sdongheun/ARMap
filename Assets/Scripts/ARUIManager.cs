@@ -57,6 +57,7 @@ public class ARUIManager : MonoBehaviour
     public Sprite iconBuilding;
 
     [Header("5. Detail View (Page 4)")]
+    public ARDetailPanelDocumentController uiToolkitDetailPanel;
     public GameObject detailViewObject;
     public RectTransform detailPanelRect;
     public ScrollRect detailScrollView;
@@ -129,6 +130,16 @@ public class ARUIManager : MonoBehaviour
         if (callPhoneButton != null) callPhoneButton.onClick.AddListener(OnCallPhone);
         if (openMapButton != null) openMapButton.onClick.AddListener(OnOpenMap);
 
+        if (uiToolkitDetailPanel != null)
+        {
+            uiToolkitDetailPanel.OnClosed += HandleUIToolkitDetailClosed;
+            uiToolkitDetailPanel.OnPhoneRequested += OnCallPhone;
+            uiToolkitDetailPanel.OnCopyRequested += OnCopyAddress;
+            uiToolkitDetailPanel.OnShareRequested += OnShareDetail;
+            uiToolkitDetailPanel.OnMapRequested += OnOpenMap;
+            SetLegacyDetailPanelVisible(false);
+        }
+
         InitializeCard(_scanRect, _scanGroup, true, statusCardPosY);
         InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
         InitializeCard(_quickRect, _quickGroup, false, quickCardPosY);
@@ -138,7 +149,10 @@ public class ARUIManager : MonoBehaviour
         if (detailPanelRect != null) _hiddenY = -2500f;
 
         EnsureScreenMarkerRoot();
-        ApplyCodeDrivenDetailTheme();
+        if (uiToolkitDetailPanel == null)
+        {
+            ApplyCodeDrivenDetailTheme();
+        }
         SetPrimaryButtonsVisible(false);
     }
 
@@ -423,6 +437,18 @@ public class ARUIManager : MonoBehaviour
     // 상세 페이지 열기 및 데이터 채우기
     public void OpenDetailView(BuildingData data)
     {
+        if (uiToolkitDetailPanel != null)
+        {
+            _currentDetailData = data;
+            _originalDetailData = data;
+            SetLegacyDetailPanelVisible(false);
+            uiToolkitDetailPanel.Show(data);
+            ClearScreenMarkers();
+            ToggleScreenMarkerOverlay(false);
+            OnDetailOpened?.Invoke();
+            return;
+        }
+
         _currentDetailData = data;
         _originalDetailData = data;
 
@@ -472,6 +498,12 @@ public class ARUIManager : MonoBehaviour
     // 상세 페이지 닫기
     public void CloseDetailView()
     {
+        if (uiToolkitDetailPanel != null && uiToolkitDetailPanel.IsVisible)
+        {
+            uiToolkitDetailPanel.Hide();
+            return;
+        }
+
         if (_detailRoutine != null) StopCoroutine(_detailRoutine);
 
         if (detailPanelRect == null)
@@ -493,6 +525,21 @@ public class ARUIManager : MonoBehaviour
 
         ToggleScreenMarkerOverlay(true);
         OnDetailClosed?.Invoke();
+    }
+
+    void HandleUIToolkitDetailClosed()
+    {
+        SetLegacyDetailPanelVisible(false);
+        ToggleScreenMarkerOverlay(true);
+        OnDetailClosed?.Invoke();
+    }
+
+    void SetLegacyDetailPanelVisible(bool visible)
+    {
+        if (detailViewObject != null)
+        {
+            detailViewObject.SetActive(visible);
+        }
     }
 
     // 입점 상가 리스트 동적 생성
@@ -1000,6 +1047,27 @@ public class ARUIManager : MonoBehaviour
             GUIUtility.systemCopyBuffer = _currentDetailData.fetchedAddress;
             ShowToast("주소가 복사되었습니다.");
         }
+    }
+
+    void OnShareDetail()
+    {
+        if (_currentDetailData == null)
+        {
+            return;
+        }
+
+        List<string> parts = new List<string>();
+        if (!string.IsNullOrEmpty(_currentDetailData.buildingName)) parts.Add(_currentDetailData.buildingName);
+        if (!string.IsNullOrEmpty(_currentDetailData.fetchedAddress)) parts.Add(_currentDetailData.fetchedAddress);
+        if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
+
+        if (parts.Count == 0)
+        {
+            return;
+        }
+
+        GUIUtility.systemCopyBuffer = string.Join("\n", parts);
+        ShowToast("건물 정보가 복사되었습니다.");
     }
 
     void OnCallPhone() { if (_currentDetailData != null && !string.IsNullOrEmpty(_currentDetailData.phoneNumber)) Application.OpenURL("tel:" + _currentDetailData.phoneNumber); }

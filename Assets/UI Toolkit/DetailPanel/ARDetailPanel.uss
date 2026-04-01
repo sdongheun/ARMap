@@ -1,0 +1,394 @@
+:root {
+    color: rgb(36, 35, 33);
+}
+
+.overlay {
+    justify-content: flex-end;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(22, 19, 17, 0);
+    opacity: 0;
+    transition-property: opacity, background-color;
+    transition-duration: 0.26s;
+    transition-timing-function: ease-out;
+}
+
+.overlay.open {
+    opacity: 1;
+    background-color: rgba(22, 19, 17, 0.12);
+}
+
+.overlay.preview-mode {
+    opacity: 1;
+    background-color: rgba(22, 19, 17, 0.12);
+}
+
+.preview-mode .overlay {
+    opacity: 1;
+    background-color: rgba(22, 19, 17, 0.12);
+}
+
+.sheet {
+    width: 100%;
+    height: 80%;
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-top: 8px;
+    padding-bottom: 14px;
+    flex-direction: column;
+    overflow: hidden;
+    border-top-left-radius: 32px;
+    border-top-right-radius: 32px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background-color: rgb(250, 248, 245);
+    border-top-width: 1px;
+    border-top-color: rgb(232, 226, 219);
+    translate: 0 120%;
+    opacity: 0;
+    transition-property: translate, opacity;
+    transition-duration: 0.28s;
+    transition-timing-function: ease-out;
+}
+
+.sheet.open {
+    translate: 0 0;
+    opacity: 1;
+}
+
+.sheet.preview-mode {
+    translate: 0 0;
+    opacity: 1;
+}
+
+.preview-mode .sheet {
+    translate: 0 0;
+    opacity: 1;
+}
+
+.sheet-handle {
+    align-self: center;
+    width: 50px;
+    height: 5px;
+    margin-top: 2px;
+    margin-bottom: 10px;
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+    background-color: rgb(219, 211, 202);
+}
+
+.sheet-header {
+    margin-bottom: 14px;
+}
+
+.header-top-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1px;
+}
+
+.header-subtitle {
+    flex-grow: 1;
+    font-size: 12px;
+    color: rgb(128, 120, 112);
+    white-space: normal;
+}
+
+.header-title {
+    margin-bottom: 0;
+    font-size: 21px;
+    -unity-font-style: bold;
+    color: rgb(34, 32, 30);
+    white-space: normal;
+}
+
+.close-button {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 18px;
+    color: rgb(133, 126, 119);
+    background-color: rgb(241, 238, 233);
+    border-left-width: 0;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.action-row {
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.action-item {
+    width: 31%;
+    align-items: center;
+}
+
+.action-circle {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    margin-bottom: 6px;
+    justify-content: center;
+    align-items: center;
+    background-color: rgb(255, 255, 255);
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 2px;
+    border-left-color: rgb(226, 221, 215);
+    border-top-color: rgb(226, 221, 215);
+    border-right-color: rgb(226, 221, 215);
+    border-bottom-color: rgb(212, 205, 197);
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+    align-self: center;
+}
+
+.action-icon {
+    width: 16px;
+    height: 16px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.action-icon-phone {
+    background-image: url("project://database/Assets/diagram/PhoneIcon.png?fileID=2800000&guid=c21c76069ea824412ba29d64350011ee&type=3#PhoneIcon");
+}
+
+.action-icon-share {
+    background-image: url("project://database/Assets/diagram/ButtonIcon.png?fileID=2800000&guid=32b249a0846194402897b7d27d72ae8d&type=3#ButtonIcon");
+}
+
+.action-icon-map {
+    background-image: url("project://database/Assets/diagram/MapIcon.png?fileID=2800000&guid=db776b0a239e64323ab6a3f266a02035&type=3#MapIcon");
+}
+
+.action-icon-copy {
+    background-image: url("project://database/Assets/diagram/CopyIcon.png?fileID=2800000&guid=07e02c8e4c6be4a99a5487b3d1f532b7&type=3#CopyIcon");
+}
+
+.action-map {
+    background-color: rgb(249, 235, 232);
+}
+
+.action-label {
+    font-size: 11px;
+    color: rgb(129, 121, 113);
+}
+
+.accent-label {
+    color: rgb(192, 70, 58);
+}
+
+.sheet-scroll {
+    flex-grow: 1;
+    flex-shrink: 1;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.sheet-scroll > .unity-scroll-view__vertical-scroller {
+    display: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.sheet-scroll > .unity-scroll-view__horizontal-scroller {
+    display: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.sheet-scroll > .unity-scroller--vertical {
+    display: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.sheet-scroll > .unity-scroller--horizontal {
+    display: none;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.sheet-scroll > .unity-scroll-view__content-viewport {
+    padding-right: 0;
+}
+
+.sheet-scroll > .unity-scroll-view__content-container {
+    padding-right: 0;
+}
+
+.address-card {
+    margin-bottom: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    background-color: rgb(241, 238, 233);
+}
+
+.card-top-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.label-with-icon {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mini-label-row {
+    margin-bottom: 6px;
+}
+
+.small-card-title {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: rgb(124, 117, 109);
+}
+
+.field-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.field-icon-address {
+    background-image: url("project://database/Assets/diagram/LocationIcon.png?fileID=2800000&guid=8b568803b389c40e0a873a07387de621&type=3#LocationIcon");
+}
+
+.field-icon-phone {
+    background-image: url("project://database/Assets/diagram/GrayPhoneIcon.png?fileID=2800000&guid=e3921578472a249c39933269c4dd8eab&type=3#GrayPhoneIcon");
+}
+
+.glyph-icon {
+    margin-right: 6px;
+    font-size: 12px;
+    color: rgb(124, 117, 109);
+}
+
+.card-action-button {
+    height: 28px;
+    min-width: 56px;
+    padding-left: 10px;
+    padding-right: 10px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    background-color: rgb(249, 235, 232);
+    border-left-width: 0;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 2px;
+    border-left-color: rgb(244, 224, 219);
+    border-top-color: rgb(244, 224, 219);
+    border-right-color: rgb(244, 224, 219);
+    border-bottom-color: rgb(231, 202, 196);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.card-action-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 5px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.card-action-label {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: rgb(192, 70, 58);
+}
+
+.address-value {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(46, 43, 40);
+    white-space: normal;
+}
+
+.info-grid {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.mini-info-card {
+    width: 48.5%;
+    min-height: 78px;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    background-color: rgb(241, 238, 233);
+}
+
+.mini-info-card.single-card {
+    width: 100%;
+}
+
+.mini-card-kicker {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: rgb(124, 117, 109);
+}
+
+.mini-card-value {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: rgb(43, 41, 38);
+    white-space: normal;
+}
+
+.accent-text {
+    color: rgb(192, 70, 58);
+}
+
+.action-circle:disabled {
+    opacity: 0.45;
+}
+
+.close-button:disabled {
+    opacity: 0.45;
+}
+
+.card-action-button:disabled {
+    opacity: 0.45;
+}
