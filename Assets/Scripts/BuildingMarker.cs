@@ -17,8 +17,8 @@ public class BuildingMarker : MonoBehaviour
     public float activeScale = 1.8f;  // 선택된 앵커 강조 크기
     public float animSpeed = 5.0f;    // 커지는 속도
     public Color hiddenColor = new Color(1f, 1f, 1f, 0f);
-    public Color previewColor = new Color(0.08f, 0.95f, 1.0f, 1.0f);
-    public Color activeColor = new Color(1.0f, 0.25f, 0.1f, 1.0f);
+    public Color previewColor = new Color(1.0f, 0.18f, 0.14f, 1.0f);
+    public Color activeColor = new Color(1.0f, 0.08f, 0.08f, 1.0f);
     public Vector3 infoLabelOffset = new Vector3(0f, 1.5f, 0f);
     public Vector2 infoLabelCanvasSize = new Vector2(260f, 92f);
     public Vector2 infoLabelTextPadding = new Vector2(20f, 14f);
@@ -26,6 +26,16 @@ public class BuildingMarker : MonoBehaviour
     private Transform _cameraTransform;
     private Vector3 _targetScaleVec;
     private SpriteRenderer[] _spriteRenderers;
+    private Transform _markerVisualRoot;
+    private CanvasGroup _markerCanvasGroup;
+    private TextMeshProUGUI _pinShadowCircleText;
+    private TextMeshProUGUI _pinShadowTailText;
+    private TextMeshProUGUI _pinGlowCircleText;
+    private TextMeshProUGUI _pinGlowTailText;
+    private TextMeshProUGUI _pinBodyCircleText;
+    private TextMeshProUGUI _pinBodyTailText;
+    private TextMeshProUGUI _pinHoleText;
+    private TextMeshProUGUI _pinHighlightText;
     private Transform _infoLabelRoot;
     private RectTransform _infoLabelRect;
     private CanvasGroup _infoCanvasGroup;
@@ -39,6 +49,7 @@ public class BuildingMarker : MonoBehaviour
     {
         _cameraTransform = Camera.main.transform;
         _spriteRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+        EnsureMarkerVisual();
         EnsureInfoLabel();
         SetState(MarkerVisualState.Hidden, true);
         SetInfoVisible(false);
@@ -55,6 +66,12 @@ public class BuildingMarker : MonoBehaviour
             {
                 _infoLabelRoot.LookAt(_infoLabelRoot.position + _cameraTransform.rotation * Vector3.forward,
                                       _cameraTransform.rotation * Vector3.up);
+            }
+
+            if (_markerVisualRoot != null)
+            {
+                _markerVisualRoot.LookAt(_markerVisualRoot.position + _cameraTransform.rotation * Vector3.forward,
+                                         _cameraTransform.rotation * Vector3.up);
             }
         }
 
@@ -90,15 +107,95 @@ public class BuildingMarker : MonoBehaviour
 
     void ApplyColor(Color color)
     {
+        if (_markerCanvasGroup != null)
+        {
+            bool visible = color.a > 0.01f;
+            _markerCanvasGroup.alpha = color.a;
+            if (_markerVisualRoot != null)
+            {
+                _markerVisualRoot.gameObject.SetActive(visible);
+            }
+
+            Color accentColor = new Color(color.r, color.g, color.b, Mathf.Clamp01(color.a * 0.42f));
+            if (_pinGlowCircleText != null) _pinGlowCircleText.color = accentColor;
+            if (_pinGlowTailText != null) _pinGlowTailText.color = accentColor;
+        }
+
         if (_spriteRenderers == null || _spriteRenderers.Length == 0) return;
 
         foreach (SpriteRenderer spriteRenderer in _spriteRenderers)
         {
             if (spriteRenderer != null)
             {
-                spriteRenderer.color = color;
+                spriteRenderer.enabled = false;
             }
         }
+    }
+
+    void EnsureMarkerVisual()
+    {
+        if (_markerVisualRoot != null)
+        {
+            return;
+        }
+
+        GameObject markerRoot = new GameObject("MarkerVisualRoot", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
+        _markerVisualRoot = markerRoot.transform;
+        _markerVisualRoot.SetParent(transform, false);
+        _markerVisualRoot.localPosition = Vector3.zero;
+        _markerVisualRoot.localRotation = Quaternion.identity;
+        _markerVisualRoot.localScale = Vector3.one * 0.01f;
+
+        Canvas canvas = markerRoot.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.sortingOrder = 450;
+
+        _markerCanvasGroup = markerRoot.GetComponent<CanvasGroup>();
+        _markerCanvasGroup.alpha = 1f;
+
+        RectTransform rootRect = markerRoot.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(180f, 220f);
+
+        _pinShadowCircleText = CreateMarkerText("PinShadowCircle", markerRoot.transform, 7f, -12f, 120f, 120f, 82f, new Color(0f, 0f, 0f, 0.26f));
+        _pinShadowTailText = CreateMarkerText("PinShadowTail", markerRoot.transform, 7f, -56f, 92f, 72f, 62f, new Color(0f, 0f, 0f, 0.24f));
+        _pinGlowCircleText = CreateMarkerText("PinGlowCircle", markerRoot.transform, 0f, -6f, 128f, 128f, 88f, new Color(1f, 0.16f, 0.12f, 0.42f));
+        _pinGlowTailText = CreateMarkerText("PinGlowTail", markerRoot.transform, 0f, -50f, 96f, 76f, 66f, new Color(1f, 0.16f, 0.12f, 0.42f));
+        _pinBodyCircleText = CreateMarkerText("PinBodyCircle", markerRoot.transform, 0f, -8f, 118f, 118f, 82f, new Color(0.06f, 0.07f, 0.1f, 1f));
+        _pinBodyTailText = CreateMarkerText("PinBodyTail", markerRoot.transform, 0f, -52f, 90f, 72f, 62f, new Color(0.06f, 0.07f, 0.1f, 1f));
+        _pinHoleText = CreateMarkerText("PinHole", markerRoot.transform, 0f, 4f, 56f, 56f, 34f, Color.white);
+        _pinHighlightText = CreateMarkerText("PinHighlight", markerRoot.transform, -18f, 20f, 28f, 28f, 18f, new Color(1f, 1f, 1f, 0.2f));
+
+        _pinShadowCircleText.text = "●";
+        _pinShadowTailText.text = "▼";
+        _pinGlowCircleText.text = "●";
+        _pinGlowTailText.text = "▼";
+        _pinBodyCircleText.text = "●";
+        _pinBodyTailText.text = "▼";
+        _pinHoleText.text = "●";
+        _pinHighlightText.text = "●";
+    }
+
+    TextMeshProUGUI CreateMarkerText(string objectName, Transform parent, float posX, float posY, float width, float height, float fontSize, Color color)
+    {
+        GameObject textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(parent, false);
+
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(posX, posY);
+        rect.sizeDelta = new Vector2(width, height);
+
+        TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyles.Bold;
+        text.color = color;
+        text.enableWordWrapping = false;
+        text.raycastTarget = false;
+
+        return text;
     }
 
     public void SetInfoContent(string title, string subtitle)

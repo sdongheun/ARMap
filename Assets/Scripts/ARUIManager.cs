@@ -21,8 +21,14 @@ public class ARUIManager : MonoBehaviour
     {
         public GameObject root;
         public RectTransform rectTransform;
-        public TextMeshProUGUI pinHeadText;
-        public TextMeshProUGUI pinTailText;
+        public TextMeshProUGUI pinShadowCircleText;
+        public TextMeshProUGUI pinShadowTailText;
+        public TextMeshProUGUI pinGlowCircleText;
+        public TextMeshProUGUI pinGlowTailText;
+        public TextMeshProUGUI pinBodyCircleText;
+        public TextMeshProUGUI pinBodyTailText;
+        public TextMeshProUGUI pinHoleText;
+        public TextMeshProUGUI pinHighlightText;
         public Image labelBackground;
         public TextMeshProUGUI titleText;
         public TextMeshProUGUI subtitleText;
@@ -132,6 +138,7 @@ public class ARUIManager : MonoBehaviour
         if (detailPanelRect != null) _hiddenY = -2500f;
 
         EnsureScreenMarkerRoot();
+        ApplyCodeDrivenDetailTheme();
         SetPrimaryButtonsVisible(false);
     }
 
@@ -194,14 +201,23 @@ public class ARUIManager : MonoBehaviour
             ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
             view.root.SetActive(true);
             view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
-            view.pinHeadText.text = "●";
-            view.pinTailText.text = "▼";
-            view.pinHeadText.fontSize = data.isSelected ? 56 : 44;
-            view.pinTailText.fontSize = data.isSelected ? 46 : 36;
+            Color accentColor = data.isSelected ? new Color(1.0f, 0.22f, 0.18f, 0.62f) : new Color(1.0f, 0.16f, 0.12f, 0.42f);
+            float circleSize = data.isSelected ? 56f : 46f;
+            float tailSize = data.isSelected ? 38f : 32f;
+            float holeSize = data.isSelected ? 23f : 18f;
+            float highlightSize = data.isSelected ? 16f : 12f;
 
-            Color markerColor = data.isSelected ? new Color(1.0f, 0.35f, 0.16f, 1f) : new Color(0.05f, 0.78f, 0.96f, 1f);
-            view.pinHeadText.color = markerColor;
-            view.pinTailText.color = markerColor;
+            view.pinShadowCircleText.fontSize = circleSize;
+            view.pinShadowTailText.fontSize = tailSize;
+            view.pinGlowCircleText.fontSize = circleSize + 5f;
+            view.pinGlowTailText.fontSize = tailSize + 4f;
+            view.pinBodyCircleText.fontSize = circleSize;
+            view.pinBodyTailText.fontSize = tailSize;
+            view.pinHoleText.fontSize = holeSize;
+            view.pinHighlightText.fontSize = highlightSize;
+
+            view.pinGlowCircleText.color = accentColor;
+            view.pinGlowTailText.color = accentColor;
 
             bool showExpandedLabel = data.isSelected;
             view.labelBackground.gameObject.SetActive(showExpandedLabel);
@@ -261,16 +277,62 @@ public class ARUIManager : MonoBehaviour
         rootRect.pivot = new Vector2(0.5f, 0.5f);
         rootRect.sizeDelta = new Vector2(260f, 120f);
 
-        TextMeshProUGUI headText = CreateScreenMarkerText("PinHead", rootObject.transform, 0f, 8f, 72f, 72f, TextAlignmentOptions.Center);
-        TextMeshProUGUI tailText = CreateScreenMarkerText("PinTail", rootObject.transform, 0f, -18f, 72f, 48f, TextAlignmentOptions.Center);
+        TextMeshProUGUI shadowCircleText = CreateScreenMarkerText("PinShadowCircle", rootObject.transform, 3f, -2f, 72f, 72f, TextAlignmentOptions.Center);
+        TextMeshProUGUI shadowTailText = CreateScreenMarkerText("PinShadowTail", rootObject.transform, 3f, -26f, 48f, 36f, TextAlignmentOptions.Center);
+        TextMeshProUGUI glowCircleText = CreateScreenMarkerText("PinGlowCircle", rootObject.transform, 0f, 0f, 78f, 78f, TextAlignmentOptions.Center);
+        TextMeshProUGUI glowTailText = CreateScreenMarkerText("PinGlowTail", rootObject.transform, 0f, -24f, 54f, 40f, TextAlignmentOptions.Center);
+        TextMeshProUGUI bodyCircleText = CreateScreenMarkerText("PinBodyCircle", rootObject.transform, 0f, 0f, 72f, 72f, TextAlignmentOptions.Center);
+        TextMeshProUGUI bodyTailText = CreateScreenMarkerText("PinBodyTail", rootObject.transform, 0f, -24f, 48f, 36f, TextAlignmentOptions.Center);
+        TextMeshProUGUI holeText = CreateScreenMarkerText("PinHole", rootObject.transform, 0f, 6f, 24f, 24f, TextAlignmentOptions.Center);
+        TextMeshProUGUI highlightText = CreateScreenMarkerText("PinHighlight", rootObject.transform, -8f, 14f, 18f, 18f, TextAlignmentOptions.Center);
 
         Image labelBackground = CreateScreenMarkerBackground(rootObject.transform, 0f, -54f, 240f, 58f);
         TextMeshProUGUI titleText = CreateScreenMarkerText("Title", labelBackground.transform, 0f, 10f, 208f, 24f, TextAlignmentOptions.Center);
         TextMeshProUGUI subtitleText = CreateScreenMarkerText("Subtitle", labelBackground.transform, 0f, -12f, 208f, 20f, TextAlignmentOptions.Center);
+        shadowCircleText.text = "●";
+        shadowTailText.text = "▼";
+        glowCircleText.text = "●";
+        glowTailText.text = "▼";
+        bodyCircleText.text = "●";
+        bodyTailText.text = "▼";
+        holeText.text = "●";
+        highlightText.text = "●";
+        shadowCircleText.fontSize = 46f;
+        shadowTailText.fontSize = 32f;
+        glowCircleText.fontSize = 51f;
+        glowTailText.fontSize = 36f;
+        bodyCircleText.fontSize = 46f;
+        bodyTailText.fontSize = 32f;
+        holeText.fontSize = 18f;
+        highlightText.fontSize = 12f;
         titleText.fontSize = 22f;
         subtitleText.fontSize = 16f;
+        shadowCircleText.color = new Color(0f, 0f, 0f, 0.24f);
+        shadowTailText.color = new Color(0f, 0f, 0f, 0.24f);
+        glowCircleText.color = new Color(1.0f, 0.16f, 0.12f, 0.42f);
+        glowTailText.color = new Color(1.0f, 0.16f, 0.12f, 0.42f);
+        bodyCircleText.color = new Color(0.06f, 0.07f, 0.1f, 1f);
+        bodyTailText.color = new Color(0.06f, 0.07f, 0.1f, 1f);
+        holeText.color = Color.white;
+        highlightText.color = new Color(1f, 1f, 1f, 0.2f);
         titleText.color = Color.white;
         subtitleText.color = new Color(0.86f, 0.93f, 1f, 0.95f);
+        shadowCircleText.enableWordWrapping = false;
+        shadowTailText.enableWordWrapping = false;
+        glowCircleText.enableWordWrapping = false;
+        glowTailText.enableWordWrapping = false;
+        bodyCircleText.enableWordWrapping = false;
+        bodyTailText.enableWordWrapping = false;
+        holeText.enableWordWrapping = false;
+        highlightText.enableWordWrapping = false;
+        shadowCircleText.raycastTarget = false;
+        shadowTailText.raycastTarget = false;
+        glowCircleText.raycastTarget = false;
+        glowTailText.raycastTarget = false;
+        bodyCircleText.raycastTarget = false;
+        bodyTailText.raycastTarget = false;
+        holeText.raycastTarget = false;
+        highlightText.raycastTarget = false;
         titleText.enableWordWrapping = false;
         titleText.overflowMode = TextOverflowModes.Ellipsis;
         subtitleText.enableWordWrapping = false;
@@ -283,8 +345,14 @@ public class ARUIManager : MonoBehaviour
         {
             root = rootObject,
             rectTransform = rootRect,
-            pinHeadText = headText,
-            pinTailText = tailText,
+            pinShadowCircleText = shadowCircleText,
+            pinShadowTailText = shadowTailText,
+            pinGlowCircleText = glowCircleText,
+            pinGlowTailText = glowTailText,
+            pinBodyCircleText = bodyCircleText,
+            pinBodyTailText = bodyTailText,
+            pinHoleText = holeText,
+            pinHighlightText = highlightText,
             labelBackground = labelBackground,
             titleText = titleText,
             subtitleText = subtitleText
@@ -358,6 +426,11 @@ public class ARUIManager : MonoBehaviour
         _currentDetailData = data;
         _originalDetailData = data;
 
+        if (detailViewObject != null)
+        {
+            detailViewObject.transform.SetAsLastSibling();
+        }
+
         detailTitle.text = data.buildingName;
         detailCategory.text = string.IsNullOrEmpty(data.description) ? "상업 시설" : data.description;
         detailAddress.text = data.fetchedAddress;
@@ -387,6 +460,8 @@ public class ARUIManager : MonoBehaviour
         UpdateFacilityList(data.facilities);
 
         detailViewObject.SetActive(true);
+        ClearScreenMarkers();
+        ToggleScreenMarkerOverlay(false);
         if (detailScrollView != null) detailScrollView.verticalNormalizedPosition = 1f;
         OnDetailOpened?.Invoke();
         
@@ -416,6 +491,7 @@ public class ARUIManager : MonoBehaviour
             detailViewObject.SetActive(false);
         }
 
+        ToggleScreenMarkerOverlay(true);
         OnDetailClosed?.Invoke();
     }
 
@@ -427,6 +503,24 @@ public class ARUIManager : MonoBehaviour
             if (child.name == "Header") continue;
             Destroy(child.gameObject);
         }
+
+        if (facilities == null || facilities.Count == 0)
+        {
+            GameObject emptyItem = Instantiate(facilityItemPrefab, facilityContainer);
+            StyleFacilityItem(emptyItem);
+            TextMeshProUGUI nameTxt = emptyItem.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
+            TextMeshProUGUI phoneTxt = emptyItem.transform.Find("PhoneText")?.GetComponent<TextMeshProUGUI>();
+            if (nameTxt != null) nameTxt.text = "등록된 주요시설이 없습니다";
+            if (phoneTxt != null) phoneTxt.text = "주변 데이터가 확인되면 표시됩니다";
+
+            Button emptyButton = emptyItem.GetComponent<Button>();
+            if (emptyButton != null)
+            {
+                emptyButton.interactable = false;
+            }
+            return;
+        }
+
         foreach (var info in facilities)
         {
             GameObject item = Instantiate(facilityItemPrefab, facilityContainer);
@@ -434,6 +528,7 @@ public class ARUIManager : MonoBehaviour
             Vector3 pos = item.transform.localPosition;
             pos.z = 0;
             item.transform.localPosition = pos;
+            StyleFacilityItem(item);
 
             TextMeshProUGUI nameTxt = item.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
             TextMeshProUGUI phoneTxt = item.transform.Find("PhoneText")?.GetComponent<TextMeshProUGUI>();
@@ -515,6 +610,350 @@ public class ARUIManager : MonoBehaviour
         }
         
         Debug.Log("원본 건물 정보로 복구되었습니다.");
+    }
+    #endregion
+
+    #region Code Driven Detail Theme
+    void ApplyCodeDrivenDetailTheme()
+    {
+        if (detailPanelRect == null) return;
+
+        EnsureDetailSheetChrome();
+
+        foreach (Image image in detailPanelRect.GetComponentsInChildren<Image>(true))
+        {
+            image.sprite = null;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+        }
+
+        StylePanelSurface(detailPanelRect.GetComponent<Image>(), new Color(0.985f, 0.988f, 0.995f, 0.985f), new Color(0.86f, 0.89f, 0.94f, 1f));
+
+        Image overlayImage = null;
+        if (detailViewObject != null)
+        {
+            overlayImage = detailViewObject.GetComponent<Image>();
+            if (overlayImage == null)
+            {
+                overlayImage = detailViewObject.AddComponent<Image>();
+            }
+        }
+        if (overlayImage != null)
+        {
+            overlayImage.sprite = null;
+            overlayImage.color = new Color(0.04f, 0.06f, 0.1f, 0.28f);
+            overlayImage.raycastTarget = true;
+        }
+
+        if (detailScrollView != null)
+        {
+            Image scrollImage = detailScrollView.GetComponent<Image>();
+            if (scrollImage != null)
+            {
+                scrollImage.color = new Color(0f, 0f, 0f, 0f);
+                RemoveGraphicEffects(scrollImage.gameObject);
+            }
+        }
+
+        RectTransform contentRect = detailScrollView != null ? detailScrollView.content : null;
+        VerticalLayoutGroup contentLayout = contentRect != null ? contentRect.GetComponent<VerticalLayoutGroup>() : null;
+        if (contentLayout != null)
+        {
+            contentLayout.padding.left = 24;
+            contentLayout.padding.right = 24;
+            contentLayout.padding.top = 28;
+            contentLayout.padding.bottom = 28;
+            contentLayout.spacing = 18;
+        }
+
+        StyleCard("LocationCard", new Color(1f, 1f, 1f, 1f), new Color(0.91f, 0.93f, 0.96f, 1f));
+        StyleCard("PhoneCard", new Color(1f, 1f, 1f, 1f), new Color(0.91f, 0.93f, 0.96f, 1f));
+        StyleCard("MapCard", new Color(1f, 0.978f, 0.975f, 1f), new Color(1f, 0.87f, 0.86f, 1f));
+        StyleCard("FacilityCard", new Color(0.995f, 0.998f, 1f, 1f), new Color(0.91f, 0.93f, 0.96f, 1f));
+
+        SetCardHeight("LocationCard", 136f);
+        SetCardHeight("PhoneCard", 110f);
+        SetCardHeight("MapCard", 92f);
+        SetCardMinHeight("FacilityCard", 180f);
+
+        StyleButton(closeDetailButton, new Color(0.12f, 0.14f, 0.18f, 1f), new Color(0.24f, 0.27f, 0.34f, 1f), "X", 13f);
+        StyleButton(callPhoneButton, new Color(0.94f, 0.955f, 0.975f, 1f), new Color(0.84f, 0.87f, 0.92f, 1f), "전화 걸기", 14f);
+        StyleButton(openMapButton, new Color(0.93f, 0.14f, 0.14f, 1f), new Color(1f, 0.4f, 0.4f, 1f), "카카오맵 열기", 15f);
+
+        if (copyAddressButton != null) copyAddressButton.gameObject.SetActive(false);
+        if (detailCategory != null) detailCategory.gameObject.SetActive(false);
+        HideObject("CategoryCard");
+        if (detailZipCode != null) detailZipCode.gameObject.SetActive(false);
+
+        SetSectionText("LcationTitleText", "위치");
+        SetSectionText("PhoneTitleText", "전화번호");
+        SetSectionText("FacilityTtileText", "주요시설");
+        SetSectionText("MapTitleText", "카카오맵 연동");
+
+        SetTextStyle(detailTitle, 30f, new Color(0.08f, 0.1f, 0.14f, 1f), FontStyles.Bold);
+        SetTextStyle(detailAddress, 16f, new Color(0.18f, 0.21f, 0.27f, 1f), FontStyles.Normal);
+        SetTextStyle(detailPhone, 16f, new Color(0.18f, 0.21f, 0.27f, 1f), FontStyles.Normal);
+
+        SetSectionStyle("LcationTitleText");
+        SetSectionStyle("PhoneTitleText");
+        SetSectionStyle("FacilityTtileText");
+        SetSectionStyle("MapTitleText");
+
+        HideDecorativeImage("BuildingIconCard");
+        HideDecorativeImage("CameraIconCard");
+        HideDecorativeImage("PhoneColorIcon");
+        HideDecorativeImage("MapWhiteIcon");
+        HideDecorativeImage("PhoneIcon");
+        HideDecorativeImage("MapIcon");
+    }
+
+    void StyleFacilityItem(GameObject item)
+    {
+        if (item == null) return;
+
+        Image rootImage = item.GetComponent<Image>();
+        if (rootImage != null)
+        {
+            rootImage.sprite = null;
+            rootImage.type = Image.Type.Simple;
+            rootImage.color = new Color(0.985f, 0.989f, 0.996f, 1f);
+            EnsureOutline(rootImage.gameObject, new Color(0.91f, 0.93f, 0.96f, 1f), new Vector2(1f, -1f));
+            EnsureShadow(rootImage.gameObject, new Color(0f, 0f, 0f, 0.05f), new Vector2(0f, -3f));
+        }
+
+        Transform phoneIcon = item.transform.Find("PhoneIcon");
+        if (phoneIcon != null) phoneIcon.gameObject.SetActive(false);
+
+        LayoutElement layoutElement = item.GetComponent<LayoutElement>();
+        if (layoutElement == null) layoutElement = item.AddComponent<LayoutElement>();
+        layoutElement.minHeight = 68f;
+        layoutElement.preferredHeight = 68f;
+
+        TextMeshProUGUI nameText = item.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
+        TextMeshProUGUI phoneText = item.transform.Find("PhoneText")?.GetComponent<TextMeshProUGUI>();
+        SetTextStyle(nameText, 15f, new Color(0.08f, 0.1f, 0.14f, 1f), FontStyles.Bold);
+        SetTextStyle(phoneText, 12f, new Color(0.46f, 0.5f, 0.57f, 1f), FontStyles.Normal);
+    }
+
+    void StyleCard(string objectName, Color fillColor, Color borderColor)
+    {
+        Transform target = FindDescendant(detailPanelRect, objectName);
+        if (target == null) return;
+
+        Image image = target.GetComponent<Image>();
+        if (image == null) return;
+
+        image.color = fillColor;
+        EnsureOutline(image.gameObject, borderColor, new Vector2(1f, -1f));
+        EnsureShadow(image.gameObject, new Color(0f, 0f, 0f, 0.06f), new Vector2(0f, -6f));
+    }
+
+    void StylePanelSurface(Image image, Color fillColor, Color borderColor)
+    {
+        if (image == null) return;
+
+        image.color = fillColor;
+        EnsureOutline(image.gameObject, borderColor, new Vector2(1f, -1f));
+        EnsureShadow(image.gameObject, new Color(0f, 0f, 0f, 0.14f), new Vector2(0f, -14f));
+    }
+
+    void StyleButton(Button button, Color fillColor, Color borderColor, string fallbackText, float labelSize)
+    {
+        if (button == null) return;
+
+        Image image = button.GetComponent<Image>();
+        if (image != null)
+        {
+            image.sprite = null;
+            image.type = Image.Type.Simple;
+            image.color = fillColor;
+            EnsureOutline(image.gameObject, borderColor, new Vector2(1f, -1f));
+            EnsureShadow(image.gameObject, new Color(0f, 0f, 0f, 0.1f), new Vector2(0f, -4f));
+        }
+
+        TextMeshProUGUI label = button.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null)
+        {
+            Color textColor = fillColor.r > 0.8f && fillColor.g > 0.8f ? new Color(0.11f, 0.13f, 0.18f, 1f) : Color.white;
+            label.text = string.IsNullOrEmpty(fallbackText) ? label.text : fallbackText;
+            SetTextStyle(label, labelSize, textColor, FontStyles.Bold);
+        }
+        else if (!string.IsNullOrEmpty(fallbackText))
+        {
+            EnsureButtonFallbackText(button.transform, fallbackText, fillColor.r > 0.8f ? new Color(0.11f, 0.13f, 0.18f, 1f) : Color.white, labelSize);
+        }
+    }
+
+    void EnsureButtonFallbackText(Transform parent, string textValue, Color color, float fontSize)
+    {
+        Transform existing = parent.Find("CodeLabel");
+        TextMeshProUGUI label = existing != null ? existing.GetComponent<TextMeshProUGUI>() : null;
+
+        if (label == null)
+        {
+            GameObject textObject = new GameObject("CodeLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+            RectTransform rect = textObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            label = textObject.GetComponent<TextMeshProUGUI>();
+            label.alignment = TextAlignmentOptions.Center;
+            label.raycastTarget = false;
+        }
+
+        label.text = textValue;
+        label.fontSize = fontSize;
+        label.fontStyle = FontStyles.Bold;
+        label.color = color;
+    }
+
+    void HideDecorativeImage(string objectName)
+    {
+        Transform target = FindDescendant(detailPanelRect, objectName);
+        if (target == null) return;
+
+        Image image = target.GetComponent<Image>();
+        if (image != null)
+        {
+            image.enabled = false;
+        }
+    }
+
+    void SetTextStyle(TextMeshProUGUI text, float fontSize, Color color, FontStyles style)
+    {
+        if (text == null) return;
+        text.fontSize = fontSize;
+        text.color = color;
+        text.fontStyle = style;
+        text.enableWordWrapping = true;
+    }
+
+    void SetSectionText(string objectName, string value)
+    {
+        TextMeshProUGUI text = FindDescendant(detailPanelRect, objectName)?.GetComponent<TextMeshProUGUI>();
+        if (text != null) text.text = value;
+    }
+
+    void SetSectionStyle(string objectName)
+    {
+        TextMeshProUGUI text = FindDescendant(detailPanelRect, objectName)?.GetComponent<TextMeshProUGUI>();
+        if (text == null) return;
+        text.fontSize = 13f;
+        text.fontStyle = FontStyles.Bold;
+        text.color = new Color(0.5f, 0.55f, 0.62f, 1f);
+        text.enableWordWrapping = false;
+    }
+
+    void HideObject(string objectName)
+    {
+        Transform target = FindDescendant(detailPanelRect, objectName);
+        if (target != null)
+        {
+            target.gameObject.SetActive(false);
+        }
+    }
+
+    void SetCardHeight(string objectName, float minHeight)
+    {
+        RectTransform rect = FindDescendant(detailPanelRect, objectName) as RectTransform;
+        if (rect == null) return;
+
+        LayoutElement layout = rect.GetComponent<LayoutElement>();
+        if (layout == null) layout = rect.gameObject.AddComponent<LayoutElement>();
+        layout.minHeight = minHeight;
+        layout.preferredHeight = minHeight;
+    }
+
+    void SetCardMinHeight(string objectName, float minHeight)
+    {
+        RectTransform rect = FindDescendant(detailPanelRect, objectName) as RectTransform;
+        if (rect == null) return;
+
+        LayoutElement layout = rect.GetComponent<LayoutElement>();
+        if (layout == null) layout = rect.gameObject.AddComponent<LayoutElement>();
+        layout.minHeight = minHeight;
+    }
+
+    void EnsureDetailSheetChrome()
+    {
+        Transform existingHandle = detailPanelRect.Find("SheetHandle");
+        Image handle = existingHandle != null ? existingHandle.GetComponent<Image>() : null;
+        if (handle == null)
+        {
+            GameObject handleObject = new GameObject("SheetHandle", typeof(RectTransform), typeof(Image));
+            handleObject.transform.SetParent(detailPanelRect, false);
+            RectTransform rect = handleObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -12f);
+            rect.sizeDelta = new Vector2(52f, 6f);
+            handle = handleObject.GetComponent<Image>();
+            handle.raycastTarget = false;
+        }
+
+        handle.sprite = null;
+        handle.color = new Color(0.8f, 0.83f, 0.88f, 1f);
+    }
+
+    void ToggleScreenMarkerOverlay(bool visible)
+    {
+        if (_screenMarkerRoot == null) return;
+        _screenMarkerRoot.gameObject.SetActive(visible);
+    }
+
+    Transform FindDescendant(Transform root, string objectName)
+    {
+        if (root == null) return null;
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (child.name == objectName) return child;
+        }
+        return null;
+    }
+
+    void EnsureOutline(GameObject target, Color color, Vector2 distance)
+    {
+        if (target == null) return;
+        Outline outline = target.GetComponent<Outline>();
+        if (outline == null) outline = target.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+        outline.useGraphicAlpha = false;
+    }
+
+    void EnsureShadow(GameObject target, Color color, Vector2 distance)
+    {
+        if (target == null) return;
+        Shadow shadow = null;
+        foreach (Shadow effect in target.GetComponents<Shadow>())
+        {
+            if (effect != null && effect.GetType() == typeof(Shadow))
+            {
+                shadow = effect;
+                break;
+            }
+        }
+        if (shadow == null) shadow = target.AddComponent<Shadow>();
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
+        shadow.useGraphicAlpha = true;
+    }
+
+    void RemoveGraphicEffects(GameObject target)
+    {
+        if (target == null) return;
+        Outline outline = target.GetComponent<Outline>();
+        if (outline != null) Destroy(outline);
+        foreach (Shadow shadow in target.GetComponents<Shadow>())
+        {
+            if (shadow != null && shadow.GetType() == typeof(Shadow))
+            {
+                Destroy(shadow);
+            }
+        }
     }
     #endregion
 
