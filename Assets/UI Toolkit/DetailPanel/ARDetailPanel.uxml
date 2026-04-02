@@ -2,62 +2,36 @@
     <Style src="project://database/Assets/UI%20Toolkit/DetailPanel/ARDetailPanel.uss?fileID=7433441132597879392&amp;guid=1b15c3ed4258444f789332d132303f90&amp;type=3#ARDetailPanel" />
     <ui:VisualElement name="detail-overlay" class="overlay">
         <ui:VisualElement name="detail-sheet" class="sheet">
-            <ui:VisualElement class="sheet-handle" />
-            <ui:VisualElement class="sheet-header">
-                <ui:VisualElement class="header-top-row">
-                    <ui:Label name="detail-subtitle" text="건물 정보" class="header-subtitle" />
-                    <ui:Button name="close-button" text="×" class="close-button" />
-                </ui:VisualElement>
-                <ui:Label name="detail-title" text="상세 정보" class="header-title" />
-            </ui:VisualElement>
-            <ui:VisualElement class="action-row">
-                <ui:VisualElement class="action-item">
-                    <ui:Button name="call-button" class="action-circle action-call">
-                        <ui:VisualElement class="action-icon action-icon-phone" />
-                    </ui:Button>
-                    <ui:Label text="전화" class="action-label" />
-                </ui:VisualElement>
-                <ui:VisualElement class="action-item">
-                    <ui:Button name="share-button" class="action-circle action-share">
-                        <ui:VisualElement class="action-icon action-icon-share" />
-                    </ui:Button>
-                    <ui:Label text="공유" class="action-label" />
-                </ui:VisualElement>
-                <ui:VisualElement class="action-item">
-                    <ui:Button name="map-button" class="action-circle action-map">
-                        <ui:VisualElement class="action-icon action-icon-map" />
-                    </ui:Button>
-                    <ui:Label text="맵" class="action-label accent-label" />
-                </ui:VisualElement>
-            </ui:VisualElement>
             <ui:ScrollView name="detail-scroll" mode="Vertical" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden" class="sheet-scroll">
-                <ui:VisualElement class="address-card">
-                    <ui:VisualElement class="card-top-row">
-                        <ui:VisualElement class="label-with-icon">
-                            <ui:VisualElement class="field-icon field-icon-address" />
-                            <ui:Label text="주소" class="small-card-title" />
-                        </ui:VisualElement>
-                        <ui:Button name="address-copy-button" class="card-action-button">
-                            <ui:VisualElement class="card-action-icon action-icon-copy" />
-                            <ui:Label text="복사" class="card-action-label" />
-                        </ui:Button>
-                    </ui:VisualElement>
-                    <ui:Label name="detail-address-value" text="주소 정보가 없습니다." class="address-value" />
+                <ui:Button name="close-button" class="close-button icon-button icon-back" />
+                <ui:VisualElement class="summary-section">
+                    <ui:Label name="detail-title" text="상세 정보" class="header-title" />
+                    <ui:Label name="detail-subtitle" text="건물 정보" class="header-subtitle" />
                 </ui:VisualElement>
-                <ui:VisualElement name="info-grid" class="info-grid">
-                    <ui:VisualElement name="hours-card" class="mini-info-card">
-                        <ui:VisualElement class="label-with-icon mini-label-row">
-                            <ui:Label text="◷" class="glyph-icon" />
-                            <ui:Label text="영업시간" class="mini-card-kicker" />
+                <ui:VisualElement class="info-section">
+                    <ui:VisualElement name="hours-row" class="info-row">
+                        <ui:VisualElement class="field-icon field-icon-clock row-icon-image" />
+                        <ui:VisualElement class="row-body">
+                            <ui:Label text="영업시간" class="row-label" />
+                            <ui:Label name="detail-hours-value" text="영업시간 정보 없음" class="row-value" />
                         </ui:VisualElement>
-                        <ui:Label name="detail-hours-value" text="영업시간 정보 없음" class="mini-card-value" />
                     </ui:VisualElement>
-                    <ui:VisualElement name="phone-card" class="mini-info-card">
-                        <ui:VisualElement class="label-with-icon mini-label-row">
-                            <ui:VisualElement class="field-icon field-icon-phone" />
-                            <ui:Label text="전화번호" class="mini-card-kicker" />
+                    <ui:VisualElement name="address-row" class="info-row">
+                        <ui:VisualElement class="field-icon field-icon-address row-icon-image" />
+                        <ui:VisualElement class="row-body row-body-wide">
+                            <ui:Label text="주소" class="row-label" />
+                            <ui:VisualElement class="row-inline">
+                                <ui:Label name="detail-address-value" text="주소 정보가 없습니다." class="row-value multiline-value inline-value" />
+                                <ui:Button name="address-copy-button" text="복사" class="inline-text-button" />
+                            </ui:VisualElement>
                         </ui:VisualElement>
-                        <ui:Label name="detail-phone-value" text="전화번호가 없습니다." class="mini-card-value accent-text" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="phone-row" class="info-row">
+                        <ui:VisualElement class="field-icon field-icon-phone row-icon-image" />
+                        <ui:VisualElement class="row-body">
+                            <ui:Label text="전화번호" class="row-label" />
+                            <ui:Label name="detail-phone-value" text="전화번호가 없습니다." class="row-value" />
+                        </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:ScrollView>

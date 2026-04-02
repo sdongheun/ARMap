@@ -10,9 +10,12 @@ public class ARDetailPanelPreview : MonoBehaviour
     public string previewCategory = "편의점";
     [TextArea(2, 4)]
     public string previewAddress = "경남 김해시 인제로 262";
+    public string previewOpeningHours = "영업 중 · 22:00까지";
     public string previewPhoneNumber = "055-321-1234";
     public string previewZipCode = "우편번호 50834";
     public string previewPlaceUrl = "https://place.map.kakao.com/";
+    public string previewPhotoUrl;
+    public string previewSecondaryPhotoUrl;
 
     private ARDetailPanelDocumentController _controller;
     private UIDocument _document;
@@ -75,9 +78,12 @@ public class ARDetailPanelPreview : MonoBehaviour
         _previewData.buildingName = previewBuildingName;
         _previewData.description = previewCategory;
         _previewData.fetchedAddress = previewAddress;
+        _previewData.openingHours = previewOpeningHours;
         _previewData.phoneNumber = previewPhoneNumber;
         _previewData.zipCode = previewZipCode;
         _previewData.placeUrl = previewPlaceUrl;
+        _previewData.photoUrl = previewPhotoUrl;
+        _previewData.secondaryPhotoUrl = previewSecondaryPhotoUrl;
 
         _controller.ShowPreview(_previewData);
     }

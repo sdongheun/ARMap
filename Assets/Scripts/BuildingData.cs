@@ -22,6 +22,8 @@ public class BuildingData
     public string placeUrl;    
     public string zipCode;     
     public string openingHours;
+    public string photoUrl;
+    public string secondaryPhotoUrl;
 
     // ★ 입점 상가 리스트 
     public List<FacilityInfo> facilities = new List<FacilityInfo>(); 

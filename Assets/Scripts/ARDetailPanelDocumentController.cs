@@ -17,19 +17,16 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     private VisualElement _root;
     private VisualElement _overlay;
     private VisualElement _sheet;
-    private VisualElement _infoGrid;
-    private VisualElement _hoursCard;
-    private VisualElement _phoneCard;
+    private VisualElement _hoursRow;
+    private VisualElement _addressRow;
+    private VisualElement _phoneRow;
     private Label _titleLabel;
     private Label _subtitleLabel;
     private Label _addressLabel;
     private Label _hoursLabel;
     private Label _phoneLabel;
     private Button _closeButton;
-    private Button _callButton;
     private Button _addressCopyButton;
-    private Button _shareButton;
-    private Button _mapButton;
     private bool _isVisible;
     private bool _isInitialized;
 
@@ -59,25 +56,19 @@ public class ARDetailPanelDocumentController : MonoBehaviour
 
         _overlay = _root.Q<VisualElement>("detail-overlay");
         _sheet = _root.Q<VisualElement>("detail-sheet");
-        _infoGrid = _root.Q<VisualElement>("info-grid");
-        _hoursCard = _root.Q<VisualElement>("hours-card");
-        _phoneCard = _root.Q<VisualElement>("phone-card");
+        _hoursRow = _root.Q<VisualElement>("hours-row");
+        _addressRow = _root.Q<VisualElement>("address-row");
+        _phoneRow = _root.Q<VisualElement>("phone-row");
         _titleLabel = _root.Q<Label>("detail-title");
         _subtitleLabel = _root.Q<Label>("detail-subtitle");
         _addressLabel = _root.Q<Label>("detail-address-value");
         _hoursLabel = _root.Q<Label>("detail-hours-value");
         _phoneLabel = _root.Q<Label>("detail-phone-value");
         _closeButton = _root.Q<Button>("close-button");
-        _callButton = _root.Q<Button>("call-button");
         _addressCopyButton = _root.Q<Button>("address-copy-button");
-        _shareButton = _root.Q<Button>("share-button");
-        _mapButton = _root.Q<Button>("map-button");
 
         if (_closeButton != null) _closeButton.clicked += Hide;
-        if (_callButton != null) _callButton.clicked += () => OnPhoneRequested?.Invoke();
         if (_addressCopyButton != null) _addressCopyButton.clicked += () => OnCopyRequested?.Invoke();
-        if (_shareButton != null) _shareButton.clicked += () => OnShareRequested?.Invoke();
-        if (_mapButton != null) _mapButton.clicked += () => OnMapRequested?.Invoke();
         if (_overlay != null) _overlay.RegisterCallback<ClickEvent>(OnOverlayClicked);
 
         VisualElement sheet = _root.Q<VisualElement>("detail-sheet");
@@ -131,7 +122,7 @@ public class ARDetailPanelDocumentController : MonoBehaviour
                 HideImmediate();
                 OnClosed?.Invoke();
             }
-        }).ExecuteLater(280);
+        }).ExecuteLater(380);
     }
 
     private void HideImmediate()
@@ -154,7 +145,9 @@ public class ARDetailPanelDocumentController : MonoBehaviour
 
         if (_subtitleLabel != null)
         {
-            _subtitleLabel.text = string.IsNullOrWhiteSpace(data.description) ? "건물 정보" : data.description;
+            bool hasCategory = !string.IsNullOrWhiteSpace(data.description);
+            _subtitleLabel.style.display = hasCategory ? DisplayStyle.Flex : DisplayStyle.None;
+            _subtitleLabel.text = hasCategory ? data.description : string.Empty;
         }
 
         if (_addressLabel != null)
@@ -164,17 +157,12 @@ public class ARDetailPanelDocumentController : MonoBehaviour
 
         if (_hoursLabel != null)
         {
-            _hoursLabel.text = string.IsNullOrWhiteSpace(data.openingHours) ? "운영시간 정보 없음" : data.openingHours;
+            _hoursLabel.text = string.IsNullOrWhiteSpace(data.openingHours) ? "영업시간 정보가 없습니다." : data.openingHours;
         }
 
         if (_phoneLabel != null)
         {
-            _phoneLabel.text = string.IsNullOrWhiteSpace(data.phoneNumber) ? "전화번호가 없습니다." : data.phoneNumber;
-        }
-
-        if (_callButton != null)
-        {
-            _callButton.SetEnabled(!string.IsNullOrWhiteSpace(data.phoneNumber));
+            _phoneLabel.text = string.IsNullOrWhiteSpace(data.phoneNumber) ? "전화번호 정보가 없습니다." : data.phoneNumber;
         }
 
         if (_addressCopyButton != null)
@@ -182,34 +170,20 @@ public class ARDetailPanelDocumentController : MonoBehaviour
             _addressCopyButton.SetEnabled(!string.IsNullOrWhiteSpace(data.fetchedAddress));
         }
 
-        if (_shareButton != null)
+        bool hasAddress = !string.IsNullOrWhiteSpace(data.fetchedAddress);
+
+        if (_addressRow != null)
         {
-            _shareButton.SetEnabled(!string.IsNullOrWhiteSpace(data.placeUrl) || !string.IsNullOrWhiteSpace(data.fetchedAddress));
+            _addressRow.style.display = hasAddress ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        if (_mapButton != null)
+        if (_phoneRow != null)
         {
-            _mapButton.SetEnabled(!string.IsNullOrWhiteSpace(data.placeUrl));
+            _phoneRow.style.display = DisplayStyle.Flex;
         }
-
-        bool hasHours = !string.IsNullOrWhiteSpace(data.openingHours);
-        bool hasPhone = !string.IsNullOrWhiteSpace(data.phoneNumber);
-
-        if (_hoursCard != null)
+        if (_hoursRow != null)
         {
-            _hoursCard.style.display = hasHours ? DisplayStyle.Flex : DisplayStyle.None;
-            _hoursCard.EnableInClassList("single-card", hasHours && !hasPhone);
-        }
-
-        if (_phoneCard != null)
-        {
-            _phoneCard.style.display = hasPhone ? DisplayStyle.Flex : DisplayStyle.None;
-            _phoneCard.EnableInClassList("single-card", hasPhone && !hasHours);
-        }
-
-        if (_infoGrid != null)
-        {
-            _infoGrid.style.display = (hasHours || hasPhone) ? DisplayStyle.Flex : DisplayStyle.None;
+            _hoursRow.style.display = DisplayStyle.Flex;
         }
     }
 

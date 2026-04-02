@@ -207,29 +207,40 @@ public class GeospatialManager : MonoBehaviour
     {
         List<VisibleBuildingCandidate> visibleCandidates = GetVisibleBuildingCandidates();
         BuildingData bestTarget = FindBestTargetFromExistingAnchors(visibleCandidates);
+        if (bestTarget == null && visibleCandidates.Count > 0)
+        {
+            bestTarget = FindBestTargetForQuickInfoFallback(visibleCandidates);
+        }
         UpdatePreviewMarkers(visibleCandidates, bestTarget);
 
         if (bestTarget != null)
         {
+            if (!IsSameBuilding(_selectedBuilding, bestTarget))
+            {
+                _selectedBuilding = bestTarget;
+            }
+
             if (_currentDetectedBuilding != bestTarget)
             {
                 _currentDetectedBuilding = bestTarget;
-                _selectedBuilding = bestTarget;
-                arUIManager.ShowQuickInfo(bestTarget);
                 UpdateMarkerScale(bestTarget);
             }
+
+            arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
         }
         else
         {
-            _selectedBuilding = null;
-
             if (_currentDetectedBuilding != null)
             {
                 _currentDetectedBuilding = null;
-                ResetAllMarkers();
+                _currentActiveMarker = null;
             }
 
-            if (visibleCandidates.Count > 0)
+            if (_selectedBuilding != null)
+            {
+                arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
+            }
+            else if (visibleCandidates.Count > 0)
             {
                 arUIManager.SetDetectedMode();
             }
@@ -359,7 +370,6 @@ public class GeospatialManager : MonoBehaviour
             {
                 id = candidate.buildingKey,
                 label = GetScreenMarkerLabel(building),
-                subtitle = GetMarkerSubtitle(building, candidate.distance),
                 screenPosition = new Vector2(screenPoint.x, screenPoint.y),
                 isSelected = selectedBuilding != null && IsSameBuilding(selectedBuilding, building)
             });
@@ -401,6 +411,22 @@ public class GeospatialManager : MonoBehaviour
     {
         string category = string.IsNullOrWhiteSpace(building.description) ? "장소 정보" : building.description;
         return $"{category} · 약 {Mathf.RoundToInt(distance)}m";
+    }
+
+    float GetDistanceToBuilding(BuildingData building)
+    {
+        if (building == null || _cameraTransform == null)
+        {
+            return -1f;
+        }
+
+        string buildingKey = GetBuildingAnchorKey(building);
+        if (!_buildingAnchors.TryGetValue(buildingKey, out ARGeospatialAnchor anchor) || anchor == null)
+        {
+            return -1f;
+        }
+
+        return Vector3.Distance(_cameraTransform.position, anchor.transform.position);
     }
 
     string GetBuildingAnchorKey(BuildingData building)
@@ -896,25 +922,56 @@ public class GeospatialManager : MonoBehaviour
 
         List<VisibleBuildingCandidate> frontMostCandidates = GetFrontMostCandidates(visibleCandidates);
         BuildingData bestTarget = null;
+        BuildingData fallbackTarget = null;
         float bestScore = float.MaxValue;
+        float fallbackScore = float.MaxValue;
         Vector2 viewportCenter = new Vector2(0.5f, 0.5f);
+        float relaxedViewportThreshold = Mathf.Min(0.38f, centerViewportThreshold + 0.1f);
 
         foreach (VisibleBuildingCandidate candidate in frontMostCandidates)
         {
             float centerDistance = Vector2.Distance(new Vector2(candidate.viewportPoint.x, candidate.viewportPoint.y), viewportCenter);
-            if (centerDistance > centerViewportThreshold)
-            {
-                continue;
-            }
-
             float score = centerDistance + candidate.distance * 0.0015f;
-            if (score < bestScore)
+
+            if (centerDistance <= centerViewportThreshold && score < bestScore)
             {
                 bestScore = score;
                 bestTarget = candidate.building;
             }
+
+            if (centerDistance <= relaxedViewportThreshold && score < fallbackScore)
+            {
+                fallbackScore = score;
+                fallbackTarget = candidate.building;
+            }
         }
-        return bestTarget;
+
+        return bestTarget ?? fallbackTarget;
+    }
+
+    BuildingData FindBestTargetForQuickInfoFallback(List<VisibleBuildingCandidate> visibleCandidates)
+    {
+        if (visibleCandidates == null || visibleCandidates.Count == 0)
+        {
+            return null;
+        }
+
+        Vector2 viewportCenter = new Vector2(0.5f, 0.5f);
+        VisibleBuildingCandidate bestCandidate = null;
+        float bestScore = float.MaxValue;
+
+        foreach (VisibleBuildingCandidate candidate in visibleCandidates)
+        {
+            float centerDistance = Vector2.Distance(new Vector2(candidate.viewportPoint.x, candidate.viewportPoint.y), viewportCenter);
+            float score = centerDistance + candidate.distance * 0.002f;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestCandidate = candidate;
+            }
+        }
+
+        return bestCandidate?.building;
     }
 
     List<VisibleBuildingCandidate> GetVisibleBuildingCandidates()
