@@ -21,14 +21,10 @@ public class ARUIManager : MonoBehaviour
     {
         public GameObject root;
         public RectTransform rectTransform;
-        public TextMeshProUGUI pinShadowCircleText;
-        public TextMeshProUGUI pinShadowTailText;
-        public TextMeshProUGUI pinGlowCircleText;
-        public TextMeshProUGUI pinGlowTailText;
-        public TextMeshProUGUI pinBodyCircleText;
-        public TextMeshProUGUI pinBodyTailText;
-        public TextMeshProUGUI pinHoleText;
-        public TextMeshProUGUI pinHighlightText;
+        public Image pinShadowImage;
+        public RectTransform pinShadowRect;
+        public Image pinImage;
+        public RectTransform pinRect;
         public Image labelBackground;
         public TextMeshProUGUI titleText;
     }
@@ -55,6 +51,8 @@ public class ARUIManager : MonoBehaviour
     public Sprite iconScanning;
     public Sprite iconDetected;
     public Sprite iconBuilding;
+    public Sprite screenMarkerDefaultSprite;
+    public Sprite screenMarkerSelectedSprite;
 
     [Header("5. Detail View (Page 4)")]
     public ARDetailPanelDocumentController uiToolkitDetailPanel;
@@ -100,6 +98,15 @@ public class ARUIManager : MonoBehaviour
     void Start()
     {
         ConfigureQuickInfoCardLayout();
+        if (screenMarkerSelectedSprite == null)
+        {
+            screenMarkerSelectedSprite = iconBuilding;
+        }
+
+        if (screenMarkerDefaultSprite == null)
+        {
+            screenMarkerDefaultSprite = screenMarkerSelectedSprite;
+        }
 
         if (quickInfoTapTarget != null)
         {
@@ -217,23 +224,28 @@ public class ARUIManager : MonoBehaviour
             ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
             view.root.SetActive(true);
             view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
-            Color accentColor = data.isSelected ? new Color(1.0f, 0.22f, 0.18f, 0.62f) : new Color(1.0f, 0.16f, 0.12f, 0.42f);
-            float circleSize = data.isSelected ? 56f : 46f;
-            float tailSize = data.isSelected ? 38f : 32f;
-            float holeSize = data.isSelected ? 23f : 18f;
-            float highlightSize = data.isSelected ? 16f : 12f;
-
-            view.pinShadowCircleText.fontSize = circleSize;
-            view.pinShadowTailText.fontSize = tailSize;
-            view.pinGlowCircleText.fontSize = circleSize + 5f;
-            view.pinGlowTailText.fontSize = tailSize + 4f;
-            view.pinBodyCircleText.fontSize = circleSize;
-            view.pinBodyTailText.fontSize = tailSize;
-            view.pinHoleText.fontSize = holeSize;
-            view.pinHighlightText.fontSize = highlightSize;
-
-            view.pinGlowCircleText.color = accentColor;
-            view.pinGlowTailText.color = accentColor;
+            float pinSize = data.isSelected ? 72f : 60f;
+            if (view.pinRect != null)
+            {
+                view.pinRect.sizeDelta = new Vector2(pinSize, pinSize);
+            }
+            if (view.pinShadowRect != null)
+            {
+                view.pinShadowRect.sizeDelta = new Vector2(pinSize + 10f, pinSize + 10f);
+            }
+            if (view.pinShadowImage != null)
+            {
+                view.pinShadowImage.color = data.isSelected
+                    ? new Color(0f, 0f, 0f, 0.28f)
+                    : new Color(0f, 0f, 0f, 0.2f);
+            }
+            if (view.pinImage != null)
+            {
+                view.pinImage.sprite = data.isSelected ? screenMarkerSelectedSprite : screenMarkerDefaultSprite;
+                view.pinImage.color = data.isSelected
+                    ? new Color(1f, 1f, 1f, 1f)
+                    : new Color(1f, 1f, 1f, 0.96f);
+            }
 
             view.labelBackground.gameObject.SetActive(true);
             view.titleText.gameObject.SetActive(true);
@@ -294,61 +306,23 @@ public class ARUIManager : MonoBehaviour
         rootRect.anchorMin = new Vector2(0.5f, 0.5f);
         rootRect.anchorMax = new Vector2(0.5f, 0.5f);
         rootRect.pivot = new Vector2(0.5f, 0.5f);
-        rootRect.sizeDelta = new Vector2(220f, 96f);
+        rootRect.sizeDelta = new Vector2(220f, 112f);
 
-        TextMeshProUGUI shadowCircleText = CreateScreenMarkerText("PinShadowCircle", rootObject.transform, 3f, -2f, 72f, 72f, TextAlignmentOptions.Center);
-        TextMeshProUGUI shadowTailText = CreateScreenMarkerText("PinShadowTail", rootObject.transform, 3f, -26f, 48f, 36f, TextAlignmentOptions.Center);
-        TextMeshProUGUI glowCircleText = CreateScreenMarkerText("PinGlowCircle", rootObject.transform, 0f, 0f, 78f, 78f, TextAlignmentOptions.Center);
-        TextMeshProUGUI glowTailText = CreateScreenMarkerText("PinGlowTail", rootObject.transform, 0f, -24f, 54f, 40f, TextAlignmentOptions.Center);
-        TextMeshProUGUI bodyCircleText = CreateScreenMarkerText("PinBodyCircle", rootObject.transform, 0f, 0f, 72f, 72f, TextAlignmentOptions.Center);
-        TextMeshProUGUI bodyTailText = CreateScreenMarkerText("PinBodyTail", rootObject.transform, 0f, -24f, 48f, 36f, TextAlignmentOptions.Center);
-        TextMeshProUGUI holeText = CreateScreenMarkerText("PinHole", rootObject.transform, 0f, 6f, 24f, 24f, TextAlignmentOptions.Center);
-        TextMeshProUGUI highlightText = CreateScreenMarkerText("PinHighlight", rootObject.transform, -8f, 14f, 18f, 18f, TextAlignmentOptions.Center);
+        Image pinShadowImage = CreateScreenMarkerImage("PinShadow", rootObject.transform, 5f, -3f, 70f, 70f);
+        Image pinImage = CreateScreenMarkerImage("Pin", rootObject.transform, 0f, 0f, 60f, 60f);
+        if (pinShadowImage != null)
+        {
+            pinShadowImage.color = new Color(0f, 0f, 0f, 0.2f);
+        }
+        if (pinImage != null)
+        {
+            pinImage.color = new Color(1f, 1f, 1f, 0.96f);
+        }
 
-        Image labelBackground = CreateScreenMarkerBackground(rootObject.transform, 0f, -46f, 170f, 26f);
+        Image labelBackground = CreateScreenMarkerBackground(rootObject.transform, 0f, -54f, 170f, 26f);
         TextMeshProUGUI titleText = CreateScreenMarkerText("Title", labelBackground.transform, 0f, 0f, 150f, 22f, TextAlignmentOptions.Center);
-        shadowCircleText.text = "●";
-        shadowTailText.text = "▼";
-        glowCircleText.text = "●";
-        glowTailText.text = "▼";
-        bodyCircleText.text = "●";
-        bodyTailText.text = "▼";
-        holeText.text = "●";
-        highlightText.text = "●";
-        shadowCircleText.fontSize = 46f;
-        shadowTailText.fontSize = 32f;
-        glowCircleText.fontSize = 51f;
-        glowTailText.fontSize = 36f;
-        bodyCircleText.fontSize = 46f;
-        bodyTailText.fontSize = 32f;
-        holeText.fontSize = 18f;
-        highlightText.fontSize = 12f;
         titleText.fontSize = 13f;
-        shadowCircleText.color = new Color(0f, 0f, 0f, 0.24f);
-        shadowTailText.color = new Color(0f, 0f, 0f, 0.24f);
-        glowCircleText.color = new Color(1.0f, 0.16f, 0.12f, 0.42f);
-        glowTailText.color = new Color(1.0f, 0.16f, 0.12f, 0.42f);
-        bodyCircleText.color = new Color(0.06f, 0.07f, 0.1f, 1f);
-        bodyTailText.color = new Color(0.06f, 0.07f, 0.1f, 1f);
-        holeText.color = Color.white;
-        highlightText.color = new Color(1f, 1f, 1f, 0.2f);
         titleText.color = Color.white;
-        shadowCircleText.enableWordWrapping = false;
-        shadowTailText.enableWordWrapping = false;
-        glowCircleText.enableWordWrapping = false;
-        glowTailText.enableWordWrapping = false;
-        bodyCircleText.enableWordWrapping = false;
-        bodyTailText.enableWordWrapping = false;
-        holeText.enableWordWrapping = false;
-        highlightText.enableWordWrapping = false;
-        shadowCircleText.raycastTarget = false;
-        shadowTailText.raycastTarget = false;
-        glowCircleText.raycastTarget = false;
-        glowTailText.raycastTarget = false;
-        bodyCircleText.raycastTarget = false;
-        bodyTailText.raycastTarget = false;
-        holeText.raycastTarget = false;
-        highlightText.raycastTarget = false;
         titleText.enableWordWrapping = false;
         titleText.overflowMode = TextOverflowModes.Ellipsis;
         labelBackground.gameObject.SetActive(true);
@@ -358,14 +332,10 @@ public class ARUIManager : MonoBehaviour
         {
             root = rootObject,
             rectTransform = rootRect,
-            pinShadowCircleText = shadowCircleText,
-            pinShadowTailText = shadowTailText,
-            pinGlowCircleText = glowCircleText,
-            pinGlowTailText = glowTailText,
-            pinBodyCircleText = bodyCircleText,
-            pinBodyTailText = bodyTailText,
-            pinHoleText = holeText,
-            pinHighlightText = highlightText,
+            pinShadowImage = pinShadowImage,
+            pinShadowRect = pinShadowImage != null ? pinShadowImage.rectTransform : null,
+            pinImage = pinImage,
+            pinRect = pinImage != null ? pinImage.rectTransform : null,
             labelBackground = labelBackground,
             titleText = titleText
         };
@@ -417,6 +387,25 @@ public class ARUIManager : MonoBehaviour
             tmp.fontSharedMaterial = fallbackMaterial;
         }
         return tmp;
+    }
+
+    Image CreateScreenMarkerImage(string name, Transform parent, float posX, float posY, float width, float height)
+    {
+        GameObject imageObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        imageObject.transform.SetParent(parent, false);
+
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(posX, posY);
+        rect.sizeDelta = new Vector2(width, height);
+
+        Image image = imageObject.GetComponent<Image>();
+        image.sprite = screenMarkerDefaultSprite != null ? screenMarkerDefaultSprite : screenMarkerSelectedSprite;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        return image;
     }
 
     Image CreateScreenMarkerBackground(Transform parent, float posX, float posY, float width, float height)
