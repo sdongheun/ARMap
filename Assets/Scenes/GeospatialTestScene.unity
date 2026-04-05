@@ -735,6 +735,19 @@ MonoBehaviour:
   toastPanel: {fileID: 218706655}
   toastText: {fileID: 113327859}
   toastDuration: 2
+  navigationSearchPanel: {fileID: 0}
+  destinationInputField: {fileID: 0}
+  searchButton: {fileID: 0}
+  searchResultContainer: {fileID: 0}
+  searchResultItemPrefab: {fileID: 0}
+  closeSearchButton: {fileID: 0}
+  navigationHUD: {fileID: 0}
+  remainingDistanceText: {fileID: 0}
+  nextGuideText: {fileID: 0}
+  stopNavigationButton: {fileID: 0}
+  offScreenIndicator: {fileID: 0}
+  mainNavigateButton: {fileID: 0}
+  detailNavigateButton: {fileID: 0}
 --- !u!114 &104506283
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1376,6 +1389,7 @@ MonoBehaviour:
   centerViewportThreshold: 0.12
   forwardGroupViewportThreshold: 0.08
   groupedCandidateDistanceBias: 3
+  isNavigationActive: 0
 --- !u!114 &176907914
 MonoBehaviour:
   m_ObjectHideFlags: 0

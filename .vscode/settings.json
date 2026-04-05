@@ -68,7 +68,7 @@
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj"
     },
-    "dotnet.defaultSolution": "ARmap_Pro_Max_Ultra_Plus.slnx",
+    "dotnet.defaultSolution": "ARMap.slnx",
     "git.ignoreLimitWarning": true,
     "[csharp]": {
         "editor.defaultFormatter": "ms-dotnettools.csharp",

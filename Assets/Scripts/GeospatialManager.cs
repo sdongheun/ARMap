@@ -85,6 +85,7 @@ public class GeospatialManager : MonoBehaviour
     private bool _isDataLoaded = false;
     private bool _isViewingInfo = false;
     private bool _isReloadingData = false;
+    public bool isNavigationActive = false;
 
     IEnumerator Start()
     {
@@ -171,6 +172,7 @@ public class GeospatialManager : MonoBehaviour
         CheckMovementAndReload(); // 위치 변경에 따른 데이터 새로고침 여부 판단
         if (EarthManager.EarthTrackingState != TrackingState.Tracking) return;
         if (_isViewingInfo) return;
+        if (isNavigationActive) return;
         CheckBuildingDetection(); // 건물 감지 로직 실행
     }
 
@@ -807,7 +809,7 @@ public class GeospatialManager : MonoBehaviour
         _isDataLoaded = true;
         _isReloadingData = false;
     }
-    private double HaversineDistance(double lat1, double lon1, double lat2, double lon2)
+    public static double HaversineDistance(double lat1, double lon1, double lat2, double lon2)
     // 두 지점 간의 거리를 계산하는 Haversine 공식
     {
         const double R = 6371e3; var phi1 = lat1 * (Math.PI / 180.0);
@@ -848,6 +850,7 @@ public class KakaoDocument
     public string place_url;
     public string y;
     public string x;
+    public string distance; // 중심 좌표로부터 직선거리(미터 문자열)
 }
 
 [System.Serializable]
