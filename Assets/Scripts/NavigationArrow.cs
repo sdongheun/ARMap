@@ -8,7 +8,7 @@ public class NavigationArrow : MonoBehaviour
 {
     [Header("스무딩 설정")]
     public float positionLerpSpeed = 5.0f;  // 위치 보간 속도
-    public float rotationLerpSpeed = 5.0f;  // 회전 보간 속도
+    public float rotationLerpSpeed = 8.0f;  // 회전 보간 속도 (빌보드 반응성)
     public float fadeDuration = 0.3f;       // 페이드 시간
 
     [Header("애니메이션 설정")]
@@ -43,6 +43,13 @@ public class NavigationArrow : MonoBehaviour
     private float _modePulseAmountMul = 1f;
     private Color _currentTint = Color.white;
 
+    [Header("빌보드 설정")]
+    public bool autoTiltBillboard = true;       // 자동 틸트 빌보드 활성화
+    public float meshBackHalfLength = 0.5f;     // 메시 뒷쪽 절반 길이 (Z=-0.5 ~ 0)
+
+    private Transform _cameraTransform;
+    private Vector3 _currentBasePos;            // yLift를 포함하지 않은 Lerp 기준 위치
+
     void Awake()
     {
         _renderers = GetComponentsInChildren<Renderer>(true);
@@ -61,14 +68,53 @@ public class NavigationArrow : MonoBehaviour
     {
         if (!_initialized) return;
 
-        // 위치 스무딩
-        transform.position = Vector3.Lerp(transform.position, _targetPosition, Time.deltaTime * positionLerpSpeed);
+        // 위치 스무딩 (베이스 위치만 Lerp, yLift는 표시 단계에서 적용)
+        _currentBasePos = Vector3.Lerp(_currentBasePos, _targetPosition, Time.deltaTime * positionLerpSpeed);
+        Vector3 smoothedPos = _currentBasePos;
 
-        // Y축 회전만 허용 (지면 수평 유지)
-        Quaternion currentRot = transform.rotation;
-        Quaternion lerpedRot = Quaternion.Slerp(currentRot, _targetRotation, Time.deltaTime * rotationLerpSpeed);
-        Vector3 euler = lerpedRot.eulerAngles;
-        transform.rotation = Quaternion.Euler(0f, euler.y, 0f);
+        // 카메라 참조 지연 캐싱 (BuildingMarker 패턴 참조)
+        if (_cameraTransform == null && Camera.main != null)
+            _cameraTransform = Camera.main.transform;
+
+        Quaternion targetRotationFinal;
+        float tiltFactor = 0f;
+
+        if (autoTiltBillboard && _cameraTransform != null)
+        {
+            // 진행 방향(Y-yaw만 유지)
+            Vector3 travelEuler = _targetRotation.eulerAngles;
+            Quaternion travelYaw = Quaternion.Euler(0f, travelEuler.y, 0f);
+            Vector3 travelDir = travelYaw * Vector3.forward;
+
+            // 카메라 방향을 travelDir에 수직인 평면에 투영
+            Vector3 toCamera = _cameraTransform.position - smoothedPos;
+            Vector3 projected = toCamera - Vector3.Dot(toCamera, travelDir) * travelDir;
+
+            if (projected.sqrMagnitude < 0.0001f)
+                projected = Vector3.up;  // 퇴화 케이스: 카메라가 travel 축 위
+            else
+                projected.Normalize();
+
+            targetRotationFinal = Quaternion.LookRotation(travelDir, projected);
+
+            // 틸트 계수: 0(플랫) ~ 1(수직)
+            tiltFactor = 1f - Mathf.Clamp01(Vector3.Dot(projected, Vector3.up));
+        }
+        else
+        {
+            // 폴백: 기존 Y축만 회전
+            Vector3 euler = _targetRotation.eulerAngles;
+            targetRotationFinal = Quaternion.Euler(0f, euler.y, 0f);
+        }
+
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotationFinal, Time.deltaTime * rotationLerpSpeed);
+
+        // 틸트 시 지면 클리핑 방지용 Y 오프셋
+        float currentScaleZ = (_baseScale.z > 0.001f ? _baseScale.z : 1f)
+                              * _modeScaleMultiplier
+                              * Mathf.Lerp(0.7f, 1.15f, _emphasisLevel);
+        float yLift = meshBackHalfLength * currentScaleZ * tiltFactor;
+        transform.position = smoothedPos + Vector3.up * yLift;
 
         // 강조 레벨 보간
         _emphasisLevel = Mathf.MoveTowards(_emphasisLevel, _targetEmphasis, Time.deltaTime * 2f);
@@ -160,6 +206,7 @@ public class NavigationArrow : MonoBehaviour
             // 최초 설정 시 즉시 적용 (Lerp 없이)
             transform.position = position;
             transform.rotation = _targetRotation;
+            _currentBasePos = position;
             _initialized = true;
         }
     }
@@ -175,6 +222,7 @@ public class NavigationArrow : MonoBehaviour
         _targetRotation = Quaternion.Euler(0f, euler.y, 0f);
         transform.position = position;
         transform.rotation = _targetRotation;
+        _currentBasePos = position;
         _initialized = true;
     }
 
