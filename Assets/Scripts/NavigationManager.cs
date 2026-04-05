@@ -49,6 +49,10 @@ public class NavigationManager : MonoBehaviour
     private double _routeOriginLat;
     private double _routeOriginLon;
 
+    // 화면 보정 (수동 리캘리브레이션) 쿨다운
+    private float _lastRecalibrateTime = -10f;
+    private const float RECALIBRATE_COOLDOWN = 1.5f;
+
     // 헤딩 스무딩 (레거시, 앵커 기반 좌표 변환 이후 사용 안함)
     private Queue<double> _headingHistory = new Queue<double>();
     private const int HEADING_WINDOW = 8;
@@ -71,6 +75,7 @@ public class NavigationManager : MonoBehaviour
             arUIManager.OnNavigateRequested += OnNavigateButtonPressed;
             arUIManager.OnNavigateFromDetailRequested += OnNavigateFromDetail;
             arUIManager.OnStopNavigationRequested += StopNavigation;
+            arUIManager.OnRecalibrateRequested += RecalibrateOrigin;
             Debug.Log("[NavigationManager] 이벤트 구독 완료");
         }
         else
@@ -95,6 +100,7 @@ public class NavigationManager : MonoBehaviour
             arUIManager.OnNavigateRequested -= OnNavigateButtonPressed;
             arUIManager.OnNavigateFromDetailRequested -= OnNavigateFromDetail;
             arUIManager.OnStopNavigationRequested -= StopNavigation;
+            arUIManager.OnRecalibrateRequested -= RecalibrateOrigin;
         }
     }
 
@@ -518,19 +524,17 @@ public class NavigationManager : MonoBehaviour
 
         DensifyRoutePoints(route, 4.0); // 4m 간격으로 보간
         MapGuidesToRoutePoints(route);
-        ComputeEunOffsets(route);
+        ComputeEunOffsets(route, route.points[0].latitude, route.points[0].longitude);
         return route;
     }
 
     /// <summary>
-    /// 경로점들을 기준점(첫 점)으로부터의 EUN(East, 0, North) 오프셋(미터)으로 변환하여 캐시한다.
+    /// 경로점들을 주어진 origin으로부터의 EUN(East, 0, North) 오프셋(미터)으로 변환하여 캐시한다.
     /// 이 값은 카메라/지도 회전과 무관하게 고정되며, 매 프레임 앵커 transform과 결합하여 world 좌표를 만든다.
     /// </summary>
-    void ComputeEunOffsets(NavigationRoute route)
+    void ComputeEunOffsets(NavigationRoute route, double originLat, double originLon)
     {
         if (route == null || route.points.Count == 0) return;
-        double originLat = route.points[0].latitude;
-        double originLon = route.points[0].longitude;
         double cosLat = Math.Cos(originLat * Math.PI / 180.0);
         foreach (RoutePoint pt in route.points)
         {
@@ -621,6 +625,68 @@ public class NavigationManager : MonoBehaviour
                 originPos.z + worldOffset.z
             );
         }
+    }
+
+    /// <summary>
+    /// 현재 카메라 GPS 위치를 새 기준 origin으로 삼아 모든 화살표/목적지 마커를 재정렬한다.
+    /// ARCore 지오스페이셜 drift로 화살표가 실제 도로와 어긋날 때 사용자가 수동으로 호출.
+    /// </summary>
+    public void RecalibrateOrigin()
+    {
+        // 연타 방지 쿨다운
+        if (Time.time - _lastRecalibrateTime < RECALIBRATE_COOLDOWN)
+            return;
+
+        // 상태 검증
+        if (_currentRoute == null || _routeOriginAnchor == null)
+        {
+            arUIManager?.ShowToast("경로가 없습니다.");
+            return;
+        }
+
+        if (EarthManager == null || EarthManager.EarthTrackingState != TrackingState.Tracking)
+        {
+            arUIManager?.ShowToast("위치 추적 불가 — 잠시 후 다시 시도해 주세요.");
+            return;
+        }
+
+        // 1. 현재 카메라 GPS 획득
+        var pose = EarthManager.CameraGeospatialPose;
+        double newLat = pose.Latitude;
+        double newLon = pose.Longitude;
+        double newAlt = pose.Altitude;
+
+        // 2. 기존 앵커 제거
+        Destroy(_routeOriginAnchor.gameObject);
+        _routeOriginAnchor = null;
+
+        // 3. 현재 GPS에 새 앵커 생성
+        _routeOriginAnchor = AnchorManager.AddAnchor(newLat, newLon, newAlt, Quaternion.identity);
+        if (_routeOriginAnchor == null)
+        {
+            Debug.LogError("[NavigationManager] 보정 앵커 생성 실패");
+            arUIManager?.ShowToast("화면 보정 실패. 다시 시도해 주세요.");
+            return;
+        }
+
+        // 4. origin 업데이트
+        _routeOriginLat = newLat;
+        _routeOriginLon = newLon;
+
+        // 5. 모든 경로점의 eunOffset을 새 origin 기준으로 재계산
+        ComputeEunOffsets(_currentRoute, newLat, newLon);
+
+        // 6. 월드 좌표 갱신
+        RefreshWorldPositions();
+
+        // 7. 화살표/목적지 마커 즉시 시각 반영
+        UpdateArrowPositions();
+        UpdateDestinationMarkerPosition();
+
+        _lastRecalibrateTime = Time.time;
+        arUIManager?.ShowToast("화면이 보정되었습니다");
+        Debug.Log($"[Nav] 화면 보정 완료 — 새 origin: ({newLat:F6}, {newLon:F6}, {newAlt:F1}m), " +
+                  $"앵커 unity pos={_routeOriginAnchor.transform.position}");
     }
 
     /// <summary>

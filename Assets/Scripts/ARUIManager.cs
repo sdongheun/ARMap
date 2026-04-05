@@ -96,6 +96,7 @@ public class ARUIManager : MonoBehaviour
     public TextMeshProUGUI remainingDistanceText;
     public TextMeshProUGUI nextGuideText;
     public Button stopNavigationButton;
+    public Button recalibrateButton;
     public RectTransform offScreenIndicator;
 
     [Header("12. Navigation Buttons")]
@@ -109,14 +110,23 @@ public class ARUIManager : MonoBehaviour
     public event Action OnNavigateRequested;
     public event Action<BuildingData> OnNavigateFromDetailRequested;
     public event Action OnStopNavigationRequested;
+    public event Action OnRecalibrateRequested;
     private bool _isNavigationMode;
     private bool _stopButtonBound;
+    private bool _recalibrateButtonBound;
 
     void BindStopNavigationButton()
     {
         if (_stopButtonBound || stopNavigationButton == null) return;
         stopNavigationButton.onClick.AddListener(() => OnStopNavigationRequested?.Invoke());
         _stopButtonBound = true;
+    }
+
+    void BindRecalibrateButton()
+    {
+        if (_recalibrateButtonBound || recalibrateButton == null) return;
+        recalibrateButton.onClick.AddListener(() => OnRecalibrateRequested?.Invoke());
+        _recalibrateButtonBound = true;
     }
     private enum UIState { None, Scanning, Detected, QuickInfo }
     private UIState currentState = UIState.None;
@@ -168,6 +178,7 @@ public class ARUIManager : MonoBehaviour
         if (closeSearchButton != null)
             closeSearchButton.onClick.AddListener(HideSearchPanel);
         BindStopNavigationButton();
+        BindRecalibrateButton();
 
         InitializeCard(_scanRect, _scanGroup, true, statusCardPosY);
         InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
@@ -1132,12 +1143,19 @@ public class ARUIManager : MonoBehaviour
         _progressFill.fillOrigin = 0;
         _progressFill.fillAmount = 0f;
 
-        // 중지 버튼
+        // 중지 버튼 (하단 오른쪽)
         stopNavigationButton = CreatePanelButton("StopNavBtn", navigationHUD.transform, "안내 중지",
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0f, 16f), new Vector2(140f, 44f),
+            new Vector2(80f, 16f), new Vector2(140f, 44f),
             new Color(0.85f, 0.2f, 0.15f, 1f));
         BindStopNavigationButton();
+
+        // 화면 보정 버튼 (하단 왼쪽 - drift 발생 시 현재 카메라 위치 기준으로 화살표 재정렬)
+        recalibrateButton = CreatePanelButton("RecalibrateBtn", navigationHUD.transform, "화면 보정",
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+            new Vector2(-80f, 16f), new Vector2(140f, 44f),
+            new Color(0.08f, 0.78f, 0.96f, 1f));
+        BindRecalibrateButton();
 
         // 트래킹 경고 배지 (GPS 신호 약함)
         _trackingWarningBadge = new GameObject("TrackingWarning", typeof(RectTransform), typeof(Image));
