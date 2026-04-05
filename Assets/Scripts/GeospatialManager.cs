@@ -207,10 +207,6 @@ public class GeospatialManager : MonoBehaviour
     {
         List<VisibleBuildingCandidate> visibleCandidates = GetVisibleBuildingCandidates();
         BuildingData bestTarget = FindBestTargetFromExistingAnchors(visibleCandidates);
-        if (bestTarget == null && visibleCandidates.Count > 0)
-        {
-            bestTarget = FindBestTargetForQuickInfoFallback(visibleCandidates);
-        }
         UpdatePreviewMarkers(visibleCandidates, bestTarget);
 
         if (bestTarget != null)
@@ -238,9 +234,10 @@ public class GeospatialManager : MonoBehaviour
 
             if (_selectedBuilding != null)
             {
-                arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
+                _selectedBuilding = null;
             }
-            else if (visibleCandidates.Count > 0)
+
+            if (visibleCandidates.Count > 0)
             {
                 arUIManager.SetDetectedMode();
             }
@@ -370,6 +367,8 @@ public class GeospatialManager : MonoBehaviour
             {
                 id = candidate.buildingKey,
                 label = GetScreenMarkerLabel(building),
+                category = string.IsNullOrWhiteSpace(building.description) ? "건물 정보" : building.description,
+                address = string.IsNullOrWhiteSpace(building.fetchedAddress) ? "주소 정보 없음" : building.fetchedAddress,
                 screenPosition = new Vector2(screenPoint.x, screenPoint.y),
                 isSelected = selectedBuilding != null && IsSameBuilding(selectedBuilding, building)
             });
@@ -947,31 +946,6 @@ public class GeospatialManager : MonoBehaviour
         }
 
         return bestTarget ?? fallbackTarget;
-    }
-
-    BuildingData FindBestTargetForQuickInfoFallback(List<VisibleBuildingCandidate> visibleCandidates)
-    {
-        if (visibleCandidates == null || visibleCandidates.Count == 0)
-        {
-            return null;
-        }
-
-        Vector2 viewportCenter = new Vector2(0.5f, 0.5f);
-        VisibleBuildingCandidate bestCandidate = null;
-        float bestScore = float.MaxValue;
-
-        foreach (VisibleBuildingCandidate candidate in visibleCandidates)
-        {
-            float centerDistance = Vector2.Distance(new Vector2(candidate.viewportPoint.x, candidate.viewportPoint.y), viewportCenter);
-            float score = centerDistance + candidate.distance * 0.002f;
-            if (score < bestScore)
-            {
-                bestScore = score;
-                bestCandidate = candidate;
-            }
-        }
-
-        return bestCandidate?.building;
     }
 
     List<VisibleBuildingCandidate> GetVisibleBuildingCandidates()

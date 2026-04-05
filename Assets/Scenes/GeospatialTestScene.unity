@@ -212,7 +212,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &73338344
 RectTransform:
   m_ObjectHideFlags: 0
@@ -331,6 +331,7 @@ MonoBehaviour:
   iconBuilding: {fileID: 21300000, guid: a8ac6e8b8876421e8127e2f9a9eb1f75, type: 3}
   screenMarkerDefaultSprite: {fileID: 21300000, guid: b3858b3df6b94dd7a5d3dfffe0064a67, type: 3}
   screenMarkerSelectedSprite: {fileID: 21300000, guid: 905704979cc24204bd23383b34443008, type: 3}
+  screenMarkerBubbleSprite: {fileID: 21300000, guid: 340820b32705d49fc9650a28a40f503b, type: 3}
   uiToolkitDetailPanel: {fileID: 645173700}
   animDuration: 0.3
   slideOffset: 150
