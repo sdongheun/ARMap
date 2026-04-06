@@ -86,6 +86,17 @@ public class ARUIManager : MonoBehaviour
     public float toastDuration = 2.0f;
     private Coroutine _toastRoutine;
 
+    [Header("8. Center Reticle")]
+    public bool showCenterReticle = true;
+    public Color centerReticleColor = new Color(1f, 1f, 1f, 0.72f);
+    public float centerReticleBarLength = 16f;
+    public float centerReticleBarThickness = 3f;
+    public float centerReticleGap = 10f;
+    public float centerReticlePulseDuration = 2.2f;
+    public float centerReticlePulseAlphaMin = 0.32f;
+    public float centerReticlePulseAlphaMax = 0.72f;
+    public float centerReticlePulseScale = 1.04f;
+
     // --- Internal Variables ---
     public event Action OnClickDetail;
     public event Action OnDetailOpened;
@@ -101,6 +112,7 @@ public class ARUIManager : MonoBehaviour
     private Canvas _canvas;
     private Image.Type _screenMarkerBubbleImageType = Image.Type.Sliced;
     private RectTransform _screenMarkerRoot;
+    private RectTransform _centerReticleRoot;
     private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
     private string _lastQuickInfoId;
 
@@ -157,12 +169,14 @@ public class ARUIManager : MonoBehaviour
         InitializeQuickInfoCard(false);
 
         EnsureScreenMarkerRoot();
+        EnsureCenterReticle();
         SetPrimaryButtonsVisible(false);
     }
 
     void Update()
     {
         UpdateScreenMarkerAnimations();
+        UpdateCenterReticleAnimation();
     }
 
     #region Main Card State Control
@@ -322,6 +336,90 @@ public class ARUIManager : MonoBehaviour
         _screenMarkerRoot.offsetMin = Vector2.zero;
         _screenMarkerRoot.offsetMax = Vector2.zero;
         _screenMarkerRoot.SetAsLastSibling();
+    }
+
+    void EnsureCenterReticle()
+    {
+        if (!showCenterReticle)
+        {
+            if (_centerReticleRoot != null)
+            {
+                _centerReticleRoot.gameObject.SetActive(false);
+            }
+            return;
+        }
+
+        if (_centerReticleRoot == null)
+        {
+            GameObject rootObject = new GameObject("CenterReticle", typeof(RectTransform));
+            rootObject.transform.SetParent(transform, false);
+            _centerReticleRoot = rootObject.GetComponent<RectTransform>();
+            _centerReticleRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _centerReticleRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _centerReticleRoot.pivot = new Vector2(0.5f, 0.5f);
+            _centerReticleRoot.anchoredPosition = Vector2.zero;
+            _centerReticleRoot.sizeDelta = Vector2.zero;
+
+            CreateCenterReticleBar("TopBar", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0f), new Vector2(0f, centerReticleGap), false);
+            CreateCenterReticleBar("BottomBar", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, -centerReticleGap), false);
+            CreateCenterReticleBar("LeftBar", new Vector2(0.5f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-centerReticleGap, 0f), true);
+            CreateCenterReticleBar("RightBar", new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(centerReticleGap, 0f), true);
+        }
+
+        _centerReticleRoot.gameObject.SetActive(true);
+        _centerReticleRoot.SetAsLastSibling();
+    }
+
+    void CreateCenterReticleBar(string name, Vector2 anchor, Vector2 pivot, Vector2 anchoredPosition, bool horizontal)
+    {
+        if (_centerReticleRoot == null)
+        {
+            return;
+        }
+
+        GameObject barObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        barObject.transform.SetParent(_centerReticleRoot, false);
+
+        RectTransform barRect = barObject.GetComponent<RectTransform>();
+        barRect.anchorMin = anchor;
+        barRect.anchorMax = anchor;
+        barRect.pivot = pivot;
+        barRect.anchoredPosition = anchoredPosition;
+        barRect.sizeDelta = horizontal
+            ? new Vector2(centerReticleBarLength, centerReticleBarThickness)
+            : new Vector2(centerReticleBarThickness, centerReticleBarLength);
+
+        Image barImage = barObject.GetComponent<Image>();
+        barImage.color = centerReticleColor;
+        barImage.raycastTarget = false;
+    }
+
+    void UpdateCenterReticleAnimation()
+    {
+        if (_centerReticleRoot == null || !_centerReticleRoot.gameObject.activeSelf)
+        {
+            return;
+        }
+
+        float duration = Mathf.Max(0.01f, centerReticlePulseDuration);
+        float cycle = (Mathf.Sin(Time.unscaledTime * (Mathf.PI * 2f / duration)) + 1f) * 0.5f;
+        float alpha = Mathf.Lerp(centerReticlePulseAlphaMin, centerReticlePulseAlphaMax, cycle);
+        float scale = Mathf.Lerp(1f, centerReticlePulseScale, cycle);
+
+        _centerReticleRoot.localScale = Vector3.one * scale;
+
+        for (int i = 0; i < _centerReticleRoot.childCount; i++)
+        {
+            Image barImage = _centerReticleRoot.GetChild(i).GetComponent<Image>();
+            if (barImage == null)
+            {
+                continue;
+            }
+
+            Color c = centerReticleColor;
+            c.a *= alpha;
+            barImage.color = c;
+        }
     }
 
     ScreenMarkerView GetOrCreateScreenMarkerView(string id)
@@ -553,11 +651,12 @@ public class ARUIManager : MonoBehaviour
         const float leftPadding = 24f;
         const float rightPadding = 28f;
         const float topPadding = 22f;
-        const float bottomPadding = 34f;
+        const float bottomPadding = 46f;
         const float iconSize = 26f;
         const float iconGap = 12f;
         const float innerGap = 4f;
         const float bubbleMinWidth = 220f;
+        const float bubbleMinHeight = 96f;
 
         float bubbleMaxWidth = 420f;
         if (_canvasRect != null)
@@ -575,12 +674,29 @@ public class ARUIManager : MonoBehaviour
         float bubbleWidth = Mathf.Clamp(leftPadding + iconSize + iconGap + contentWidth + rightPadding, bubbleMinWidth, bubbleMaxWidth);
         float actualTextWidth = bubbleWidth - leftPadding - rightPadding - iconSize - iconGap;
 
+        bool hasCategory = !string.IsNullOrWhiteSpace(view.categoryText.text);
+        bool hasAddress = !string.IsNullOrWhiteSpace(view.addressText.text);
+
         float titleHeight = Mathf.Max(20f, view.titleText.GetPreferredValues(view.titleText.text, actualTextWidth, 0f).y);
-        float categoryHeight = Mathf.Max(16f, view.categoryText.GetPreferredValues(view.categoryText.text, actualTextWidth, 0f).y);
-        float addressHeight = Mathf.Max(18f, view.addressText.GetPreferredValues(view.addressText.text, actualTextWidth, 0f).y);
-        float textBlockHeight = titleHeight + innerGap + categoryHeight + innerGap + addressHeight;
+        float categoryHeight = hasCategory
+            ? Mathf.Max(16f, view.categoryText.GetPreferredValues(view.categoryText.text, actualTextWidth, 0f).y)
+            : 0f;
+        float addressHeight = hasAddress
+            ? Mathf.Max(18f, view.addressText.GetPreferredValues(view.addressText.text, actualTextWidth, 0f).y)
+            : 0f;
+
+        float textBlockHeight = titleHeight;
+        if (hasCategory)
+        {
+            textBlockHeight += innerGap + categoryHeight;
+        }
+        if (hasAddress)
+        {
+            textBlockHeight += innerGap + addressHeight;
+        }
+
         float contentHeight = Mathf.Max(iconSize, textBlockHeight);
-        float bubbleHeight = Mathf.Max(118f, topPadding + contentHeight + bottomPadding);
+        float bubbleHeight = Mathf.Max(bubbleMinHeight, topPadding + contentHeight + bottomPadding);
 
         view.bubbleRect.sizeDelta = new Vector2(bubbleWidth, bubbleHeight);
 
@@ -605,15 +721,27 @@ public class ARUIManager : MonoBehaviour
         categoryRect.anchorMin = new Vector2(0f, 1f);
         categoryRect.anchorMax = new Vector2(0f, 1f);
         categoryRect.pivot = new Vector2(0f, 1f);
-        categoryRect.anchoredPosition = new Vector2(textStartX, -textStartY - titleHeight - innerGap);
+        categoryRect.anchoredPosition = new Vector2(textStartX, -textStartY - titleHeight - (hasCategory ? innerGap : 0f));
         categoryRect.sizeDelta = new Vector2(actualTextWidth, categoryHeight);
+        view.categoryText.gameObject.SetActive(hasCategory);
 
         RectTransform addressRect = view.addressText.rectTransform;
         addressRect.anchorMin = new Vector2(0f, 1f);
         addressRect.anchorMax = new Vector2(0f, 1f);
         addressRect.pivot = new Vector2(0f, 1f);
-        addressRect.anchoredPosition = new Vector2(textStartX, -textStartY - titleHeight - innerGap - categoryHeight - innerGap);
+        float addressOffsetY = textStartY + titleHeight;
+        if (hasCategory)
+        {
+            addressOffsetY += innerGap + categoryHeight;
+        }
+        if (hasAddress)
+        {
+            addressOffsetY += innerGap;
+        }
+
+        addressRect.anchoredPosition = new Vector2(textStartX, -addressOffsetY);
         addressRect.sizeDelta = new Vector2(actualTextWidth, addressHeight);
+        view.addressText.gameObject.SetActive(hasAddress);
     }
 
     void UpdateScreenMarkerAnimations()

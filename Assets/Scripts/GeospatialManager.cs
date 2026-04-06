@@ -929,16 +929,21 @@ public class GeospatialManager : MonoBehaviour
 
         foreach (VisibleBuildingCandidate candidate in frontMostCandidates)
         {
-            float centerDistance = Vector2.Distance(new Vector2(candidate.viewportPoint.x, candidate.viewportPoint.y), viewportCenter);
-            float score = centerDistance + candidate.distance * 0.0015f;
+            Vector2 viewportOffset = new Vector2(
+                Mathf.Abs(candidate.viewportPoint.x - viewportCenter.x),
+                Mathf.Abs(candidate.viewportPoint.y - viewportCenter.y));
+            bool withinPrimaryFocus = viewportOffset.x <= centerViewportThreshold && viewportOffset.y <= centerViewportThreshold;
+            bool withinRelaxedFocus = viewportOffset.x <= relaxedViewportThreshold && viewportOffset.y <= relaxedViewportThreshold;
+            float focusScore = viewportOffset.x + viewportOffset.y;
+            float score = focusScore + candidate.distance * 0.0015f;
 
-            if (centerDistance <= centerViewportThreshold && score < bestScore)
+            if (withinPrimaryFocus && score < bestScore)
             {
                 bestScore = score;
                 bestTarget = candidate.building;
             }
 
-            if (centerDistance <= relaxedViewportThreshold && score < fallbackScore)
+            if (withinRelaxedFocus && score < fallbackScore)
             {
                 fallbackScore = score;
                 fallbackTarget = candidate.building;
