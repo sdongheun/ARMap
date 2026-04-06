@@ -32,6 +32,8 @@ public class ARUIManager : MonoBehaviour
         public Vector2 pinHiddenPosition;
         public Vector2 pinShownPosition;
         public Image bubbleBackground;
+        public Image bubbleShadow;
+        public RectTransform bubbleShadowRect;
         public RectTransform bubbleRect;
         public CanvasGroup bubbleGroup;
         public Vector2 bubbleHiddenPosition;
@@ -69,7 +71,6 @@ public class ARUIManager : MonoBehaviour
     public Sprite iconBuilding;
     public Sprite screenMarkerDefaultSprite;
     public Sprite screenMarkerSelectedSprite;
-    public Sprite screenMarkerBubbleSprite;
 
     [Header("5. Detail View (Page 4)")]
     public ARDetailPanelDocumentController uiToolkitDetailPanel;
@@ -96,6 +97,10 @@ public class ARUIManager : MonoBehaviour
     public float centerReticlePulseAlphaMin = 0.32f;
     public float centerReticlePulseAlphaMax = 0.72f;
     public float centerReticlePulseScale = 1.04f;
+    public float screenMarkerCornerRadius = 18f;
+    public Vector2 screenMarkerShadowOffset = new Vector2(0f, -10f);
+    public float screenMarkerShadowExpansion = 10f;
+    public Color screenMarkerShadowColor = new Color(0.08f, 0.12f, 0.2f, 0.22f);
 
     // --- Internal Variables ---
     public event Action OnClickDetail;
@@ -110,9 +115,10 @@ public class ARUIManager : MonoBehaviour
     private Coroutine _scanRoutine, _detectRoutine, _quickRoutine;
     private RectTransform _canvasRect;
     private Canvas _canvas;
-    private Image.Type _screenMarkerBubbleImageType = Image.Type.Sliced;
     private RectTransform _screenMarkerRoot;
     private RectTransform _centerReticleRoot;
+    private Sprite _screenMarkerPanelSprite;
+    private Texture2D _screenMarkerPanelTexture;
     private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
     private string _lastQuickInfoId;
 
@@ -123,18 +129,12 @@ public class ARUIManager : MonoBehaviour
         _quickRect = quickInfoCard.GetComponent<RectTransform>(); _quickGroup = quickInfoCard.GetComponent<CanvasGroup>();
         _canvasRect = GetComponent<RectTransform>();
         _canvas = GetComponent<Canvas>();
+        _screenMarkerPanelSprite = CreateRoundedPanelSprite();
     }
 
     void Start()
     {
         ConfigureQuickInfoCardLayout();
-        Image quickInfoBackground = quickInfoCard != null ? quickInfoCard.GetComponent<Image>() : null;
-        if (quickInfoBackground != null && quickInfoBackground.sprite != null)
-        {
-            screenMarkerBubbleSprite = quickInfoBackground.sprite;
-            _screenMarkerBubbleImageType = quickInfoBackground.type;
-        }
-
         if (screenMarkerSelectedSprite == null)
         {
             screenMarkerSelectedSprite = iconBuilding;
@@ -143,11 +143,6 @@ public class ARUIManager : MonoBehaviour
         if (screenMarkerDefaultSprite == null)
         {
             screenMarkerDefaultSprite = screenMarkerSelectedSprite;
-        }
-
-        if (screenMarkerBubbleSprite == null)
-        {
-            screenMarkerBubbleSprite = screenMarkerSelectedSprite;
         }
 
         if (quickInfoTapTarget != null)
@@ -171,6 +166,45 @@ public class ARUIManager : MonoBehaviour
         EnsureScreenMarkerRoot();
         EnsureCenterReticle();
         SetPrimaryButtonsVisible(false);
+    }
+
+    Sprite CreateRoundedPanelSprite()
+    {
+        const int textureSize = 64;
+        int radius = Mathf.Clamp(Mathf.RoundToInt(screenMarkerCornerRadius), 2, textureSize / 2 - 2);
+        _screenMarkerPanelTexture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
+        _screenMarkerPanelTexture.name = "ScreenMarkerPanelTexture";
+        _screenMarkerPanelTexture.wrapMode = TextureWrapMode.Clamp;
+        _screenMarkerPanelTexture.filterMode = FilterMode.Bilinear;
+
+        Color32[] pixels = new Color32[textureSize * textureSize];
+        float innerMin = radius - 1f;
+        float radiusSq = radius * radius;
+
+        for (int y = 0; y < textureSize; y++)
+        {
+            for (int x = 0; x < textureSize; x++)
+            {
+                float nearestX = Mathf.Clamp(x, radius, textureSize - radius - 1);
+                float nearestY = Mathf.Clamp(y, radius, textureSize - radius - 1);
+                float dx = x - nearestX;
+                float dy = y - nearestY;
+                bool inside = (dx * dx + dy * dy) <= radiusSq || (Mathf.Abs(dx) < 0.01f && Mathf.Abs(dy) < 0.01f);
+                pixels[(y * textureSize) + x] = inside ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+            }
+        }
+
+        _screenMarkerPanelTexture.SetPixels32(pixels);
+        _screenMarkerPanelTexture.Apply();
+
+        return Sprite.Create(
+            _screenMarkerPanelTexture,
+            new Rect(0f, 0f, textureSize, textureSize),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0u,
+            SpriteMeshType.FullRect,
+            new Vector4(radius, radius, radius, radius));
     }
 
     void Update()
@@ -453,6 +487,25 @@ public class ARUIManager : MonoBehaviour
             pinImage.color = new Color(1f, 1f, 1f, 0.96f);
         }
 
+        Vector2 bubbleHiddenPosition = new Vector2(0f, 6f);
+        Vector2 bubbleShownPosition = new Vector2(0f, 42f);
+
+        GameObject bubbleShadowObject = new GameObject("BubbleShadow", typeof(RectTransform), typeof(Image));
+        bubbleShadowObject.transform.SetParent(rootObject.transform, false);
+
+        RectTransform bubbleShadowRect = bubbleShadowObject.GetComponent<RectTransform>();
+        bubbleShadowRect.anchorMin = new Vector2(0.5f, 0.5f);
+        bubbleShadowRect.anchorMax = new Vector2(0.5f, 0.5f);
+        bubbleShadowRect.pivot = new Vector2(0.5f, 0f);
+        bubbleShadowRect.anchoredPosition = bubbleHiddenPosition + screenMarkerShadowOffset;
+        bubbleShadowRect.sizeDelta = new Vector2(230f, 114f);
+
+        Image bubbleShadow = bubbleShadowObject.GetComponent<Image>();
+        bubbleShadow.sprite = _screenMarkerPanelSprite;
+        bubbleShadow.type = Image.Type.Sliced;
+        bubbleShadow.color = screenMarkerShadowColor;
+        bubbleShadow.raycastTarget = false;
+
         GameObject bubbleObject = new GameObject("Bubble", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Button));
         bubbleObject.transform.SetParent(rootObject.transform, false);
 
@@ -460,15 +513,13 @@ public class ARUIManager : MonoBehaviour
         bubbleRect.anchorMin = new Vector2(0.5f, 0.5f);
         bubbleRect.anchorMax = new Vector2(0.5f, 0.5f);
         bubbleRect.pivot = new Vector2(0.5f, 0f);
-        Vector2 bubbleHiddenPosition = new Vector2(0f, 6f);
-        Vector2 bubbleShownPosition = new Vector2(0f, 42f);
         bubbleRect.anchoredPosition = bubbleHiddenPosition;
         bubbleRect.sizeDelta = new Vector2(220f, 104f);
 
         Image bubbleBackground = bubbleObject.GetComponent<Image>();
-        bubbleBackground.sprite = screenMarkerBubbleSprite;
-        bubbleBackground.type = _screenMarkerBubbleImageType;
-        bubbleBackground.color = new Color(1f, 1f, 1f, 0.98f);
+        bubbleBackground.sprite = _screenMarkerPanelSprite;
+        bubbleBackground.type = Image.Type.Sliced;
+        bubbleBackground.color = new Color(1f, 1f, 1f, 0.82f);
         bubbleBackground.raycastTarget = true;
 
         CanvasGroup bubbleGroup = bubbleObject.GetComponent<CanvasGroup>();
@@ -497,10 +548,11 @@ public class ARUIManager : MonoBehaviour
 
         TextMeshProUGUI titleText = CreateScreenMarkerText("Title", bubbleObject.transform, 0f, 0f, 180f, 24f, TextAlignmentOptions.TopLeft);
         TextMeshProUGUI categoryText = CreateScreenMarkerText("Category", bubbleObject.transform, 0f, 0f, 180f, 20f, TextAlignmentOptions.MidlineLeft);
-        TextMeshProUGUI addressText = CreateScreenMarkerText("Address", bubbleObject.transform, 0f, 0f, 180f, 42f, TextAlignmentOptions.TopLeft);
-        ConfigureBubbleText(titleText, 17f, FontStyles.Bold, new Color(0.06f, 0.07f, 0.1f, 1f), true);
-        ConfigureBubbleText(categoryText, 12f, FontStyles.Normal, new Color(0.28f, 0.33f, 0.41f, 1f), false);
-        ConfigureBubbleText(addressText, 11f, FontStyles.Normal, new Color(0.18f, 0.22f, 0.28f, 0.95f), true);
+        TextMeshProUGUI addressText = CreateScreenMarkerText("Address", bubbleObject.transform, 0f, 0f, 72f, 20f, TextAlignmentOptions.MidlineRight);
+        ConfigureBubbleText(titleText, 17f, FontStyles.Bold, new Color(0.06f, 0.07f, 0.1f, 1f), TextWrappingModes.NoWrap, TextOverflowModes.Overflow);
+        titleText.overflowMode = TextOverflowModes.Overflow;
+        ConfigureBubbleText(categoryText, 12f, FontStyles.Normal, new Color(0.28f, 0.33f, 0.41f, 1f), TextWrappingModes.NoWrap, TextOverflowModes.Ellipsis);
+        ConfigureBubbleText(addressText, 12f, FontStyles.Bold, new Color(0.18f, 0.22f, 0.28f, 0.95f), TextWrappingModes.NoWrap, TextOverflowModes.Ellipsis);
 
         ScreenMarkerView view = new ScreenMarkerView
         {
@@ -515,6 +567,8 @@ public class ARUIManager : MonoBehaviour
             pinHiddenPosition = pinHiddenPosition,
             pinShownPosition = pinShownPosition,
             bubbleBackground = bubbleBackground,
+            bubbleShadow = bubbleShadow,
+            bubbleShadowRect = bubbleShadowRect,
             bubbleRect = bubbleRect,
             bubbleGroup = bubbleGroup,
             bubbleHiddenPosition = bubbleHiddenPosition,
@@ -592,16 +646,110 @@ public class ARUIManager : MonoBehaviour
         return rect;
     }
 
-    void ConfigureBubbleText(TextMeshProUGUI text, float fontSize, FontStyles fontStyle, Color color, bool wrap)
+    void ConfigureBubbleText(TextMeshProUGUI text, float fontSize, FontStyles fontStyle, Color color, TextWrappingModes wrappingMode, TextOverflowModes overflowMode)
     {
         if (text == null) return;
 
         text.fontSize = fontSize;
         text.fontStyle = fontStyle;
         text.color = color;
-        text.enableWordWrapping = wrap;
-        text.overflowMode = wrap ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis;
+        text.textWrappingMode = wrappingMode;
+        text.overflowMode = overflowMode;
         text.raycastTarget = false;
+    }
+
+    string WrapTextByWordBoundary(TextMeshProUGUI text, string value, float maxWidth)
+    {
+        if (text == null || string.IsNullOrWhiteSpace(value) || maxWidth <= 0f)
+        {
+            return value ?? string.Empty;
+        }
+
+        string normalized = value.Replace("\r\n", "\n");
+        string[] paragraphs = normalized.Split('\n');
+        List<string> wrappedLines = new List<string>();
+
+        foreach (string paragraph in paragraphs)
+        {
+            if (string.IsNullOrWhiteSpace(paragraph))
+            {
+                wrappedLines.Add(string.Empty);
+                continue;
+            }
+
+            string[] words = paragraph.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0)
+            {
+                wrappedLines.Add(string.Empty);
+                continue;
+            }
+
+            string currentLine = words[0];
+            for (int i = 1; i < words.Length; i++)
+            {
+                string candidateLine = $"{currentLine} {words[i]}";
+                float singleLineWidth = text.GetPreferredValues(candidateLine, 0f, 0f).x;
+                if (singleLineWidth <= maxWidth)
+                {
+                    currentLine = candidateLine;
+                    continue;
+                }
+
+                wrappedLines.Add(currentLine);
+                currentLine = words[i];
+            }
+
+            wrappedLines.Add(currentLine);
+        }
+
+        return string.Join("\n", wrappedLines);
+    }
+
+    float GetWrappedTextMaxLineWidth(TextMeshProUGUI text, string wrappedValue)
+    {
+        if (text == null || string.IsNullOrEmpty(wrappedValue))
+        {
+            return 0f;
+        }
+
+        string[] lines = wrappedValue.Split('\n');
+        float maxLineWidth = 0f;
+        foreach (string line in lines)
+        {
+            maxLineWidth = Mathf.Max(maxLineWidth, text.GetPreferredValues(line, 0f, 0f).x);
+        }
+
+        return maxLineWidth;
+    }
+
+    float GetRenderedTextHeight(TextMeshProUGUI text, string value, float width, float fallbackMinHeight)
+    {
+        if (text == null)
+        {
+            return fallbackMinHeight;
+        }
+
+        RectTransform rect = text.rectTransform;
+        Vector2 previousSize = rect.sizeDelta;
+        string previousText = text.text;
+
+        rect.sizeDelta = new Vector2(width, Mathf.Max(previousSize.y, fallbackMinHeight));
+        if (text.text != value)
+        {
+            text.text = value;
+        }
+
+        text.ForceMeshUpdate();
+        float renderedHeight = Mathf.Max(fallbackMinHeight, text.preferredHeight);
+
+        rect.sizeDelta = previousSize;
+        if (text.text != previousText)
+        {
+            text.text = previousText;
+            text.ForceMeshUpdate();
+        }
+
+        return renderedHeight;
     }
 
     Image CreateScreenMarkerImage(string name, Transform parent, float posX, float posY, float width, float height)
@@ -651,12 +799,12 @@ public class ARUIManager : MonoBehaviour
         const float leftPadding = 24f;
         const float rightPadding = 28f;
         const float topPadding = 22f;
-        const float bottomPadding = 46f;
         const float iconSize = 26f;
         const float iconGap = 12f;
         const float innerGap = 4f;
+        const float distanceGap = 16f;
         const float bubbleMinWidth = 220f;
-        const float bubbleMinHeight = 96f;
+        const float bubbleMinHeight = 70f;
 
         float bubbleMaxWidth = 420f;
         if (_canvasRect != null)
@@ -664,84 +812,103 @@ public class ARUIManager : MonoBehaviour
             bubbleMaxWidth = Mathf.Clamp(_canvasRect.rect.width - 96f, 320f, 620f);
         }
 
-        float textMaxWidth = bubbleMaxWidth - leftPadding - rightPadding - iconSize - iconGap;
-
-        float titlePreferredWidth = Mathf.Min(textMaxWidth, view.titleText.GetPreferredValues(view.titleText.text, textMaxWidth, 0f).x);
-        float categoryPreferredWidth = Mathf.Min(textMaxWidth, view.categoryText.GetPreferredValues(view.categoryText.text, textMaxWidth, 0f).x);
-        float addressPreferredWidth = Mathf.Min(textMaxWidth, view.addressText.GetPreferredValues(view.addressText.text, textMaxWidth, 0f).x);
-
-        float contentWidth = Mathf.Clamp(Mathf.Max(titlePreferredWidth, categoryPreferredWidth, addressPreferredWidth), 110f, textMaxWidth);
-        float bubbleWidth = Mathf.Clamp(leftPadding + iconSize + iconGap + contentWidth + rightPadding, bubbleMinWidth, bubbleMaxWidth);
-        float actualTextWidth = bubbleWidth - leftPadding - rightPadding - iconSize - iconGap;
-
         bool hasCategory = !string.IsNullOrWhiteSpace(view.categoryText.text);
-        bool hasAddress = !string.IsNullOrWhiteSpace(view.addressText.text);
+        bool hasDistance = !string.IsNullOrWhiteSpace(view.addressText.text);
+        string rawTitle = view.titleText.text ?? string.Empty;
 
-        float titleHeight = Mathf.Max(20f, view.titleText.GetPreferredValues(view.titleText.text, actualTextWidth, 0f).y);
+        float maxDistanceWidth = 88f;
+        float distancePreferredWidth = hasDistance
+            ? view.addressText.GetPreferredValues(view.addressText.text, maxDistanceWidth, 0f).x
+            : 0f;
+        float distanceColumnWidth = hasDistance
+            ? Mathf.Clamp(distancePreferredWidth, 52f, maxDistanceWidth)
+            : 0f;
+        float distanceSectionWidth = hasDistance ? distanceGap + distanceColumnWidth : 0f;
+
+        float textMaxWidth = bubbleMaxWidth - leftPadding - rightPadding - iconSize - iconGap - distanceSectionWidth;
+        float actualMiddleWidth = Mathf.Max(96f, textMaxWidth);
+
+        string wrappedTitle = WrapTextByWordBoundary(view.titleText, rawTitle, actualMiddleWidth);
+        if (view.titleText.text != wrappedTitle)
+        {
+            view.titleText.text = wrappedTitle;
+        }
+
+        float titleWidth = Mathf.Min(actualMiddleWidth, GetWrappedTextMaxLineWidth(view.titleText, wrappedTitle));
+        float categoryWidth = hasCategory
+            ? Mathf.Min(actualMiddleWidth, view.categoryText.GetPreferredValues(view.categoryText.text, 0f, 0f).x)
+            : 0f;
+        float middleColumnWidth = Mathf.Clamp(Mathf.Max(titleWidth, categoryWidth, 96f), 96f, textMaxWidth);
+        float bubbleWidth = Mathf.Clamp(
+            leftPadding + iconSize + iconGap + middleColumnWidth + distanceSectionWidth + rightPadding,
+            bubbleMinWidth,
+            bubbleMaxWidth);
+        actualMiddleWidth = bubbleWidth - leftPadding - rightPadding - iconSize - iconGap - distanceSectionWidth;
+
+        wrappedTitle = WrapTextByWordBoundary(view.titleText, rawTitle, actualMiddleWidth);
+        if (view.titleText.text != wrappedTitle)
+        {
+            view.titleText.text = wrappedTitle;
+        }
+
+        float titleHeight = GetRenderedTextHeight(view.titleText, wrappedTitle, actualMiddleWidth, 20f);
         float categoryHeight = hasCategory
-            ? Mathf.Max(16f, view.categoryText.GetPreferredValues(view.categoryText.text, actualTextWidth, 0f).y)
+            ? GetRenderedTextHeight(view.categoryText, view.categoryText.text, actualMiddleWidth, 16f)
             : 0f;
-        float addressHeight = hasAddress
-            ? Mathf.Max(18f, view.addressText.GetPreferredValues(view.addressText.text, actualTextWidth, 0f).y)
+        float distanceHeight = hasDistance
+            ? GetRenderedTextHeight(view.addressText, view.addressText.text, distanceColumnWidth, 18f)
             : 0f;
 
-        float textBlockHeight = titleHeight;
+        float middleColumnHeight = titleHeight;
         if (hasCategory)
         {
-            textBlockHeight += innerGap + categoryHeight;
-        }
-        if (hasAddress)
-        {
-            textBlockHeight += innerGap + addressHeight;
+            middleColumnHeight += innerGap + categoryHeight;
         }
 
-        float contentHeight = Mathf.Max(iconSize, textBlockHeight);
-        float bubbleHeight = Mathf.Max(bubbleMinHeight, topPadding + contentHeight + bottomPadding);
+        float contentHeight = Mathf.Max(iconSize, Mathf.Max(middleColumnHeight, distanceHeight));
+        float bubbleHeight = Mathf.Max(bubbleMinHeight, (topPadding * 2f) + contentHeight);
+        float verticalInset = (bubbleHeight - contentHeight) * 0.5f;
 
         view.bubbleRect.sizeDelta = new Vector2(bubbleWidth, bubbleHeight);
+        if (view.bubbleShadowRect != null)
+        {
+            view.bubbleShadowRect.sizeDelta = new Vector2(
+                bubbleWidth + screenMarkerShadowExpansion,
+                bubbleHeight + screenMarkerShadowExpansion);
+        }
 
         RectTransform iconRect = view.bubbleIcon.rectTransform;
         iconRect.anchorMin = new Vector2(0f, 1f);
         iconRect.anchorMax = new Vector2(0f, 1f);
         iconRect.pivot = new Vector2(0f, 1f);
-        iconRect.anchoredPosition = new Vector2(leftPadding, -topPadding - Mathf.Max(0f, (contentHeight - iconSize) * 0.5f));
+        iconRect.anchoredPosition = new Vector2(leftPadding, -verticalInset - Mathf.Max(0f, (contentHeight - iconSize) * 0.5f));
         iconRect.sizeDelta = new Vector2(iconSize, iconSize);
 
         float textStartX = leftPadding + iconSize + iconGap;
-        float textStartY = topPadding + Mathf.Max(0f, (contentHeight - textBlockHeight) * 0.5f);
+        float textStartY = verticalInset + Mathf.Max(0f, (contentHeight - middleColumnHeight) * 0.5f);
 
         RectTransform titleRect = view.titleText.rectTransform;
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(0f, 1f);
         titleRect.pivot = new Vector2(0f, 1f);
         titleRect.anchoredPosition = new Vector2(textStartX, -textStartY);
-        titleRect.sizeDelta = new Vector2(actualTextWidth, titleHeight);
+        titleRect.sizeDelta = new Vector2(actualMiddleWidth, titleHeight);
 
         RectTransform categoryRect = view.categoryText.rectTransform;
         categoryRect.anchorMin = new Vector2(0f, 1f);
         categoryRect.anchorMax = new Vector2(0f, 1f);
         categoryRect.pivot = new Vector2(0f, 1f);
         categoryRect.anchoredPosition = new Vector2(textStartX, -textStartY - titleHeight - (hasCategory ? innerGap : 0f));
-        categoryRect.sizeDelta = new Vector2(actualTextWidth, categoryHeight);
+        categoryRect.sizeDelta = new Vector2(actualMiddleWidth, categoryHeight);
         view.categoryText.gameObject.SetActive(hasCategory);
 
         RectTransform addressRect = view.addressText.rectTransform;
-        addressRect.anchorMin = new Vector2(0f, 1f);
-        addressRect.anchorMax = new Vector2(0f, 1f);
-        addressRect.pivot = new Vector2(0f, 1f);
-        float addressOffsetY = textStartY + titleHeight;
-        if (hasCategory)
-        {
-            addressOffsetY += innerGap + categoryHeight;
-        }
-        if (hasAddress)
-        {
-            addressOffsetY += innerGap;
-        }
-
-        addressRect.anchoredPosition = new Vector2(textStartX, -addressOffsetY);
-        addressRect.sizeDelta = new Vector2(actualTextWidth, addressHeight);
-        view.addressText.gameObject.SetActive(hasAddress);
+        addressRect.anchorMin = new Vector2(1f, 1f);
+        addressRect.anchorMax = new Vector2(1f, 1f);
+        addressRect.pivot = new Vector2(1f, 0.5f);
+        addressRect.anchoredPosition = new Vector2(-rightPadding, -(bubbleHeight * 0.5f));
+        addressRect.sizeDelta = new Vector2(distanceColumnWidth, distanceHeight);
+        view.addressText.gameObject.SetActive(hasDistance);
     }
 
     void UpdateScreenMarkerAnimations()
@@ -800,6 +967,15 @@ public class ARUIManager : MonoBehaviour
             {
                 view.bubbleRect.localScale = Vector3.Lerp(new Vector3(0.2f, 0.12f, 1f), Vector3.one, t);
                 view.bubbleRect.anchoredPosition = Vector2.Lerp(view.bubbleHiddenPosition, view.bubbleShownPosition, t);
+            }
+
+            if (view.bubbleShadowRect != null)
+            {
+                view.bubbleShadowRect.localScale = Vector3.Lerp(new Vector3(0.2f, 0.12f, 1f), Vector3.one, t);
+                view.bubbleShadowRect.anchoredPosition = Vector2.Lerp(
+                    view.bubbleHiddenPosition + screenMarkerShadowOffset,
+                    view.bubbleShownPosition + screenMarkerShadowOffset,
+                    t);
             }
         }
     }

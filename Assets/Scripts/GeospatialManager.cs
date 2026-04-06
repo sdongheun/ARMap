@@ -368,7 +368,7 @@ public class GeospatialManager : MonoBehaviour
                 id = candidate.buildingKey,
                 label = GetScreenMarkerLabel(building),
                 category = string.IsNullOrWhiteSpace(building.description) ? "건물 정보" : building.description,
-                address = string.IsNullOrWhiteSpace(building.fetchedAddress) ? "주소 정보 없음" : building.fetchedAddress,
+                address = $"약 {Mathf.RoundToInt(candidate.distance)}m",
                 screenPosition = new Vector2(screenPoint.x, screenPoint.y),
                 isSelected = selectedBuilding != null && IsSameBuilding(selectedBuilding, building)
             });
