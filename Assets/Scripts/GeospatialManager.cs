@@ -11,6 +11,13 @@ using System.IO;
 
 public class GeospatialManager : MonoBehaviour
 {
+    private enum ClusterGroupingType
+    {
+        Default,
+        Institutional,
+        Commercial
+    }
+
     [Serializable]
     private class LocalApiKeys
     {
@@ -38,6 +45,26 @@ public class GeospatialManager : MonoBehaviour
         public int keywordResultCount;
         public int mergedUniqueCount;
     }
+
+    private static readonly string[] InstitutionalKeywords =
+    {
+        "학교", "대학교", "병원", "센터", "관", "동", "청사", "연구소", "연구원", "교육원", "대학원", "도서관", "학생회관", "행정실", "학과"
+    };
+
+    private static readonly string[] CommercialKeywords =
+    {
+        "마트", "편의점", "카페", "음식점", "약국", "상가"
+    };
+
+    private static readonly string[] InstitutionalBuildingSuffixes =
+    {
+        "본관", "별관", "기념도서관", "도서관", "학생회관", "기념관", "회관", "학관", "연구동", "행정동", "센터", "연구소", "연구원", "관", "동"
+    };
+
+    private static readonly string[] InstitutionalPrefixTokens =
+    {
+        "대학교", "대학", "병원", "캠퍼스", "학교", "김해캠퍼스", "부산캠퍼스", "인제대학교", "인제대"
+    };
 
     // --- Inspector Settings ---
     [Header("AR Components")]
@@ -821,8 +848,18 @@ public class GeospatialManager : MonoBehaviour
                     double.Parse(compareDoc.y), double.Parse(compareDoc.x));
 
                 bool isSameAddress = NormalizeText(GetBestAddress(baseDoc)) == NormalizeText(GetBestAddress(compareDoc));
+                string baseBuildingToken = GetInstitutionalBuildingToken(baseDoc);
+                string compareBuildingToken = GetInstitutionalBuildingToken(compareDoc);
+                float effectiveClusterRadius = GetEffectiveClusterRadius(baseDoc, compareDoc);
 
-                if (distance <= clusterRadius && isSameAddress)
+                if (!string.IsNullOrWhiteSpace(baseBuildingToken) &&
+                    !string.IsNullOrWhiteSpace(compareBuildingToken) &&
+                    NormalizeText(baseBuildingToken) != NormalizeText(compareBuildingToken))
+                {
+                    continue;
+                }
+
+                if (distance <= effectiveClusterRadius && isSameAddress)
                 {
                     newCluster.Add(compareDoc);
                     processedIndices.Add(j);
@@ -836,32 +873,116 @@ public class GeospatialManager : MonoBehaviour
     BuildingData ProcessClusterIntoBuildingData(List<KakaoDocument> cluster)
     {
         BuildingData newBuilding = new BuildingData();
-        KakaoDocument representative = SelectRepresentativeDocument(cluster);
+        KakaoDocument detailRepresentative = SelectRepresentativeDocument(cluster);
+        string institutionalBuildingToken = SelectInstitutionalBuildingToken(cluster);
+        bool useInstitutionalBuildingName = !string.IsNullOrWhiteSpace(institutionalBuildingToken);
+        KakaoDocument nameRepresentative = SelectBuildingNameDocument(cluster, detailRepresentative, institutionalBuildingToken);
 
-        newBuilding.buildingName = representative.place_name;
-        newBuilding.latitude = double.Parse(representative.y);
-        newBuilding.longitude = double.Parse(representative.x);
+        newBuilding.buildingName = useInstitutionalBuildingName ? institutionalBuildingToken : nameRepresentative.place_name;
+        newBuilding.latitude = double.Parse(nameRepresentative.y);
+        newBuilding.longitude = double.Parse(nameRepresentative.x);
         newBuilding.altitude = 0;
-        newBuilding.fetchedAddress = GetBestAddress(representative);
-        newBuilding.description = representative.category_group_name;
+        newBuilding.fetchedAddress = !string.IsNullOrWhiteSpace(GetBestAddress(nameRepresentative))
+            ? GetBestAddress(nameRepresentative)
+            : GetBestAddress(detailRepresentative);
+        newBuilding.description = GetBuildingDescription(cluster, newBuilding.buildingName, nameRepresentative, detailRepresentative, useInstitutionalBuildingName);
 
-        newBuilding.phoneNumber = representative.phone;
-        newBuilding.placeUrl = representative.place_url;
-        newBuilding.zipCode = representative.address_name;
+        newBuilding.phoneNumber = detailRepresentative.phone;
+        newBuilding.placeUrl = detailRepresentative.place_url;
+        newBuilding.zipCode = detailRepresentative.address_name;
 
-        newBuilding.facilities = new List<FacilityInfo>();
-        foreach (var doc in cluster)
-        {
-            FacilityInfo info = new FacilityInfo();
-            info.name = doc.place_name;
-            info.phone = doc.phone;
-            info.category = doc.category_group_name;
-            info.placeUrl = doc.place_url;
-
-            newBuilding.facilities.Add(info);
-        }
+        newBuilding.facilities = BuildFacilityList(cluster, newBuilding.buildingName, institutionalBuildingToken);
 
         return newBuilding;
+    }
+
+    string GetBuildingDescription(List<KakaoDocument> cluster, string buildingName, KakaoDocument nameRepresentative, KakaoDocument detailRepresentative, bool useInstitutionalBuildingName)
+    {
+        if (useInstitutionalBuildingName)
+        {
+            KakaoDocument keywordBuildingDocument = cluster
+                .Where(document => NormalizeText(document?.category_group_name) == NormalizeText("키워드 검색"))
+                .FirstOrDefault(document => IsBuildingReferenceDocument(document, buildingName, buildingName));
+
+            if (keywordBuildingDocument != null)
+            {
+                return "키워드 검색";
+            }
+
+            string institutionalDisplayCategory = GetDocumentDisplayCategory(nameRepresentative, "학교시설");
+            if (!string.IsNullOrWhiteSpace(institutionalDisplayCategory) &&
+                institutionalDisplayCategory != "키워드 검색")
+            {
+                return institutionalDisplayCategory;
+            }
+
+            return "학교시설";
+        }
+
+        return GetDocumentDisplayCategory(detailRepresentative, "장소 정보");
+    }
+
+    List<FacilityInfo> BuildFacilityList(List<KakaoDocument> cluster, string buildingName, string buildingToken)
+    {
+        Dictionary<string, KakaoDocument> uniqueFacilities = new Dictionary<string, KakaoDocument>();
+        string normalizedBuildingName = NormalizeText(buildingName);
+
+        foreach (KakaoDocument document in cluster)
+        {
+            if (document == null || string.IsNullOrWhiteSpace(document.place_name))
+            {
+                continue;
+            }
+
+            string normalizedPlaceName = NormalizeText(document.place_name);
+            if (normalizedPlaceName == normalizedBuildingName)
+            {
+                continue;
+            }
+
+            if (IsBuildingReferenceDocument(document, buildingName, buildingToken))
+            {
+                continue;
+            }
+
+            if (uniqueFacilities.TryGetValue(normalizedPlaceName, out KakaoDocument existingDocument))
+            {
+                if (ShouldReplaceDocument(existingDocument, document))
+                {
+                    uniqueFacilities[normalizedPlaceName] = document;
+                }
+                continue;
+            }
+
+            uniqueFacilities[normalizedPlaceName] = document;
+        }
+
+        return uniqueFacilities.Values
+            .OrderByDescending(GetDocumentQualityScore)
+            .ThenBy(document => document.place_name)
+            .Select(document => new FacilityInfo
+            {
+                name = document.place_name,
+                phone = document.phone,
+                category = GetDocumentDisplayCategory(document, "장소 정보"),
+                placeUrl = document.place_url
+            })
+            .ToList();
+    }
+
+    string GetDocumentDisplayCategory(KakaoDocument document, string defaultCategory)
+    {
+        if (!string.IsNullOrWhiteSpace(document?.category_name))
+        {
+            return document.category_name;
+        }
+
+        if (!string.IsNullOrWhiteSpace(document?.category_group_name))
+        {
+            return document.category_group_name;
+        }
+
+        return defaultCategory;
     }
 
     KakaoDocument SelectRepresentativeDocument(List<KakaoDocument> cluster)
@@ -872,6 +993,232 @@ public class GeospatialManager : MonoBehaviour
             .ThenByDescending(document => !string.IsNullOrWhiteSpace(document.phone))
             .ThenByDescending(document => document.place_name?.Length ?? 0)
             .First();
+    }
+
+    KakaoDocument SelectBuildingNameDocument(List<KakaoDocument> cluster, KakaoDocument fallbackDocument, string buildingToken)
+    {
+        if (cluster == null || cluster.Count == 0)
+        {
+            return fallbackDocument;
+        }
+
+        if (!string.IsNullOrWhiteSpace(buildingToken))
+        {
+            KakaoDocument tokenDocument = cluster
+                .Where(document => NormalizeText(GetInstitutionalBuildingToken(document)) == NormalizeText(buildingToken))
+                .OrderByDescending(document => IsBuildingReferenceDocument(document, buildingToken, buildingToken))
+                .ThenByDescending(document => GetClusterGroupingType(document) == ClusterGroupingType.Institutional)
+                .ThenByDescending(GetDocumentQualityScore)
+                .ThenByDescending(document => !string.IsNullOrWhiteSpace(document.road_address_name))
+                .FirstOrDefault();
+
+            if (tokenDocument != null)
+            {
+                return tokenDocument;
+            }
+        }
+
+        KakaoDocument buildingNameCandidate = cluster
+            .Where(IsInstitutionalBuildingNameCandidate)
+            .OrderByDescending(GetInstitutionalBuildingNameScore)
+            .ThenByDescending(GetDocumentQualityScore)
+            .ThenBy(document => document.place_name?.Length ?? int.MaxValue)
+            .FirstOrDefault();
+
+        return buildingNameCandidate ?? fallbackDocument;
+    }
+
+    string SelectInstitutionalBuildingToken(List<KakaoDocument> cluster)
+    {
+        return cluster
+            .Select(document => GetInstitutionalBuildingToken(document))
+            .Where(token => !string.IsNullOrWhiteSpace(token))
+            .GroupBy(token => NormalizeText(token))
+            .OrderByDescending(group => group.Count())
+            .ThenByDescending(group => group.Max(token => token.Length))
+            .Select(group => group.First())
+            .FirstOrDefault();
+    }
+
+    bool IsInstitutionalBuildingNameCandidate(KakaoDocument document)
+    {
+        if (document == null || GetClusterGroupingType(document) != ClusterGroupingType.Institutional)
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(GetInstitutionalBuildingToken(document));
+    }
+
+    int GetInstitutionalBuildingNameScore(KakaoDocument document)
+    {
+        string normalizedPlaceName = NormalizeText(GetInstitutionalBuildingToken(document));
+        int score = 0;
+
+        if (normalizedPlaceName.EndsWith(NormalizeText("본관"))) score += 60;
+        if (normalizedPlaceName.EndsWith(NormalizeText("별관"))) score += 55;
+        if (normalizedPlaceName.EndsWith(NormalizeText("기념도서관"))) score += 54;
+        if (normalizedPlaceName.EndsWith(NormalizeText("도서관"))) score += 53;
+        if (normalizedPlaceName.EndsWith(NormalizeText("학생회관"))) score += 52;
+        if (normalizedPlaceName.EndsWith(NormalizeText("기념관"))) score += 51;
+        if (normalizedPlaceName.EndsWith(NormalizeText("관"))) score += 50;
+        if (normalizedPlaceName.EndsWith(NormalizeText("동"))) score += 45;
+        if (!string.IsNullOrWhiteSpace(document?.road_address_name)) score += 10;
+
+        return score;
+    }
+
+    float GetEffectiveClusterRadius(KakaoDocument left, KakaoDocument right)
+    {
+        ClusterGroupingType leftType = GetClusterGroupingType(left);
+        ClusterGroupingType rightType = GetClusterGroupingType(right);
+        string leftToken = NormalizeText(GetInstitutionalBuildingToken(left));
+        string rightToken = NormalizeText(GetInstitutionalBuildingToken(right));
+
+        if (!string.IsNullOrWhiteSpace(leftToken) &&
+            !string.IsNullOrWhiteSpace(rightToken) &&
+            leftToken == rightToken)
+        {
+            return Mathf.Max(clusterRadius, 80.0f);
+        }
+
+        if (leftType == ClusterGroupingType.Commercial || rightType == ClusterGroupingType.Commercial)
+        {
+            return clusterRadius;
+        }
+
+        if (leftType == ClusterGroupingType.Institutional && rightType == ClusterGroupingType.Institutional)
+        {
+            return Mathf.Max(clusterRadius, 80.0f);
+        }
+
+        return clusterRadius;
+    }
+
+    ClusterGroupingType GetClusterGroupingType(KakaoDocument document)
+    {
+        string normalizedPlaceName = NormalizeText(document?.place_name);
+        string normalizedCategory = NormalizeText(document?.category_group_name);
+
+        if (ContainsAnyKeyword(normalizedPlaceName, CommercialKeywords) || ContainsAnyKeyword(normalizedCategory, CommercialKeywords))
+        {
+            return ClusterGroupingType.Commercial;
+        }
+
+        if (ContainsAnyKeyword(normalizedPlaceName, InstitutionalKeywords) || ContainsAnyKeyword(normalizedCategory, InstitutionalKeywords))
+        {
+            return ClusterGroupingType.Institutional;
+        }
+
+        return ClusterGroupingType.Default;
+    }
+
+    bool ContainsAnyKeyword(string normalizedValue, string[] keywords)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedValue))
+        {
+            return false;
+        }
+
+        foreach (string keyword in keywords)
+        {
+            if (normalizedValue.Contains(NormalizeText(keyword)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    string GetInstitutionalBuildingToken(KakaoDocument document)
+    {
+        string addressToken = ExtractInstitutionalBuildingToken(GetBestAddress(document));
+        if (!string.IsNullOrWhiteSpace(addressToken))
+        {
+            return addressToken;
+        }
+
+        return ExtractInstitutionalBuildingToken(document?.place_name);
+    }
+
+    string ExtractInstitutionalBuildingToken(string sourceText)
+    {
+        if (string.IsNullOrWhiteSpace(sourceText))
+        {
+            return string.Empty;
+        }
+
+        string[] tokens = sourceText
+            .Replace("(", " ")
+            .Replace(")", " ")
+            .Replace(",", " ")
+            .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (string token in tokens)
+        {
+            if (IsInstitutionalBuildingToken(token))
+            {
+                return token.Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    bool IsInstitutionalBuildingToken(string token)
+    {
+        string normalizedToken = NormalizeText(token);
+        if (string.IsNullOrWhiteSpace(normalizedToken))
+        {
+            return false;
+        }
+
+        if (ContainsAnyKeyword(normalizedToken, CommercialKeywords))
+        {
+            return false;
+        }
+
+        foreach (string suffix in InstitutionalBuildingSuffixes)
+        {
+            if (normalizedToken.EndsWith(NormalizeText(suffix)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool IsBuildingReferenceDocument(KakaoDocument document, string buildingName, string buildingToken)
+    {
+        if (document == null || string.IsNullOrWhiteSpace(document.place_name))
+        {
+            return false;
+        }
+
+        string normalizedBuildingName = NormalizeText(buildingName);
+        string normalizedBuildingToken = NormalizeText(string.IsNullOrWhiteSpace(buildingToken) ? buildingName : buildingToken);
+        string normalizedPlaceName = NormalizeText(document.place_name);
+
+        if (normalizedPlaceName == normalizedBuildingName || normalizedPlaceName == normalizedBuildingToken)
+        {
+            return true;
+        }
+
+        string extractedToken = NormalizeText(GetInstitutionalBuildingToken(document));
+        if (string.IsNullOrWhiteSpace(extractedToken) || extractedToken != normalizedBuildingToken)
+        {
+            return false;
+        }
+
+        string reducedName = normalizedPlaceName.Replace(normalizedBuildingToken, string.Empty);
+        foreach (string prefixToken in InstitutionalPrefixTokens)
+        {
+            reducedName = reducedName.Replace(NormalizeText(prefixToken), string.Empty);
+        }
+
+        return string.IsNullOrWhiteSpace(reducedName);
     }
 
     void CreateAllBuildingAnchors()
@@ -1157,6 +1504,7 @@ public class KakaoDocument
     public string place_name;
     public string road_address_name;
     public string address_name;
+    public string category_name;
     public string category_group_name;
     public string category_group_code;
     public string phone;

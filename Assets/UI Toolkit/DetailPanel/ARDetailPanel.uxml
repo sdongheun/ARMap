@@ -14,7 +14,7 @@
                             </ui:VisualElement>
                             <ui:VisualElement name="facility-toggle-chevron" class="facility-toggle-chevron facility-toggle-chevron-icon" />
                         </ui:VisualElement>
-                        <ui:VisualElement name="facility-list" class="facility-list" />
+                        <ui:ScrollView name="facility-list" mode="Vertical" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden" class="facility-list" />
                     </ui:VisualElement>
                     <ui:Label name="detail-subtitle" text="건물 정보" class="header-subtitle" />
                 </ui:VisualElement>
@@ -38,6 +38,9 @@
                                 <ui:Button name="phone-call-button" text="통화" class="inline-text-button" />
                             </ui:VisualElement>
                         </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="map-action-row" class="map-action-row">
+                        <ui:Button name="map-open-button" text="카카오맵에서 보기" class="map-open-button" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:ScrollView>

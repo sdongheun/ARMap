@@ -70,9 +70,10 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     private VisualElement _sheet;
     private VisualElement _facilitySelectorSection;
     private VisualElement _facilityToggleButton;
-    private VisualElement _facilityList;
+    private ScrollView _facilityList;
     private VisualElement _addressRow;
     private VisualElement _phoneRow;
+    private VisualElement _mapActionRow;
     private Label _titleLabel;
     private Label _subtitleLabel;
     private Label _facilityToggleLabel;
@@ -82,6 +83,7 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     private Button _closeButton;
     private Button _addressCopyButton;
     private Button _phoneCallButton;
+    private Button _mapOpenButton;
     private VisualElement _facilityToggleChevronIcon;
     private bool _isVisible;
     private bool _isInitialized;
@@ -118,9 +120,10 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         _sheet = _root.Q<VisualElement>("detail-sheet");
         _facilitySelectorSection = _root.Q<VisualElement>("facility-selector-section");
         _facilityToggleButton = _root.Q<VisualElement>("facility-toggle-button");
-        _facilityList = _root.Q<VisualElement>("facility-list");
+        _facilityList = _root.Q<ScrollView>("facility-list");
         _addressRow = _root.Q<VisualElement>("address-row");
         _phoneRow = _root.Q<VisualElement>("phone-row");
+        _mapActionRow = _root.Q<VisualElement>("map-action-row");
         _titleLabel = _root.Q<Label>("detail-title");
         _subtitleLabel = _root.Q<Label>("detail-subtitle");
         _facilityToggleLabel = _root.Q<Label>("facility-toggle-label");
@@ -131,10 +134,12 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         _closeButton = _root.Q<Button>("close-button");
         _addressCopyButton = _root.Q<Button>("address-copy-button");
         _phoneCallButton = _root.Q<Button>("phone-call-button");
+        _mapOpenButton = _root.Q<Button>("map-open-button");
 
         if (_closeButton != null) _closeButton.clicked += Hide;
         if (_addressCopyButton != null) _addressCopyButton.clicked += () => OnCopyRequested?.Invoke();
         if (_phoneCallButton != null) _phoneCallButton.clicked += () => OnPhoneRequested?.Invoke();
+        if (_mapOpenButton != null) _mapOpenButton.clicked += () => OnMapRequested?.Invoke();
         if (_facilityToggleButton != null) _facilityToggleButton.RegisterCallback<ClickEvent>(OnFacilityToggleClicked);
         if (_overlay != null) _overlay.RegisterCallback<ClickEvent>(OnOverlayClicked);
 
@@ -265,6 +270,16 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         {
             _phoneCallButton.style.display = hasPhone ? DisplayStyle.Flex : DisplayStyle.None;
             _phoneCallButton.SetEnabled(hasPhone);
+        }
+
+        bool hasMap = !string.IsNullOrWhiteSpace(CurrentDisplayedPlaceUrl);
+        if (_mapActionRow != null)
+        {
+            _mapActionRow.style.display = hasMap ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+        if (_mapOpenButton != null)
+        {
+            _mapOpenButton.SetEnabled(hasMap);
         }
     }
 
