@@ -161,6 +161,7 @@ public class ARUIManager : MonoBehaviour
     private Texture2D _screenMarkerPanelTexture;
     private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
     private string _lastQuickInfoId;
+    private TextMeshProUGUI quickTitleText => quickBuildingNameText;
 
     void Awake()
     {
@@ -206,8 +207,7 @@ public class ARUIManager : MonoBehaviour
             {
                 if (_currentDetailData != null)
                 {
-                    BuildingData navTarget = _originalDetailData ?? _currentDetailData;
-                    OnNavigateFromDetailRequested?.Invoke(navTarget);
+                    OnNavigateFromDetailRequested?.Invoke(_currentDetailData);
                 }
             });
         if (closeSearchButton != null)
@@ -219,12 +219,9 @@ public class ARUIManager : MonoBehaviour
         InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
         InitializeCard(_quickRect, _quickGroup, false, quickCardPosY);
 
-        if (detailViewObject != null) detailViewObject.SetActive(false);
         if (navigationSearchPanel != null) navigationSearchPanel.SetActive(false);
         if (navigationHUD != null) navigationHUD.SetActive(false);
         if (offScreenIndicator != null) offScreenIndicator.gameObject.SetActive(false);
-        
-        if (detailPanelRect != null) _hiddenY = -2500f;
 
         EnsureScreenMarkerRoot();
         EnsureNavigationButton();
@@ -1251,6 +1248,52 @@ public class ARUIManager : MonoBehaviour
             return;
         }
 
+        List<string> parts = new List<string>();
+        string selectedPlaceName = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceName : string.Empty;
+        string selectedPlaceUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : string.Empty;
+
+        if (!string.IsNullOrEmpty(_currentDetailData.buildingName)) parts.Add(_currentDetailData.buildingName);
+        if (!string.IsNullOrEmpty(selectedPlaceName) && selectedPlaceName != _currentDetailData.buildingName) parts.Add(selectedPlaceName);
+        if (!string.IsNullOrEmpty(_currentDetailData.fetchedAddress)) parts.Add(_currentDetailData.fetchedAddress);
+        if (!string.IsNullOrEmpty(selectedPlaceUrl)) parts.Add(selectedPlaceUrl);
+        else if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
+
+        if (parts.Count == 0)
+        {
+            return;
+        }
+
+        GUIUtility.systemCopyBuffer = string.Join("\n", parts);
+        ShowToast("건물 정보가 복사되었습니다.");
+    }
+
+    void OnCallPhone()
+    {
+        if (_currentDetailData == null)
+        {
+            return;
+        }
+
+        string phoneNumber = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPhoneNumber : _currentDetailData.phoneNumber;
+        if (!string.IsNullOrEmpty(phoneNumber))
+        {
+            Application.OpenURL("tel:" + phoneNumber);
+        }
+    }
+
+    void OnOpenMap()
+    {
+        if (_currentDetailData == null)
+        {
+            return;
+        }
+
+        string placeUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : _currentDetailData.placeUrl;
+        if (!string.IsNullOrEmpty(placeUrl))
+        {
+            Application.OpenURL(placeUrl);
+        }
+    }
     #region Navigation UI
     void EnsureSearchPanel()
     {
@@ -2147,54 +2190,6 @@ public class ARUIManager : MonoBehaviour
     }
     #endregion
 
-    #region Animations
-    IEnumerator AnimateDetailPanel(float startY, float targetY, Action onComplete = null)
-        List<string> parts = new List<string>();
-        string selectedPlaceName = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceName : string.Empty;
-        string selectedPlaceUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : string.Empty;
-
-        if (!string.IsNullOrEmpty(_currentDetailData.buildingName)) parts.Add(_currentDetailData.buildingName);
-        if (!string.IsNullOrEmpty(selectedPlaceName) && selectedPlaceName != _currentDetailData.buildingName) parts.Add(selectedPlaceName);
-        if (!string.IsNullOrEmpty(_currentDetailData.fetchedAddress)) parts.Add(_currentDetailData.fetchedAddress);
-        if (!string.IsNullOrEmpty(selectedPlaceUrl)) parts.Add(selectedPlaceUrl);
-        else if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
-
-        if (parts.Count == 0)
-        {
-            return;
-        }
-
-        GUIUtility.systemCopyBuffer = string.Join("\n", parts);
-        ShowToast("건물 정보가 복사되었습니다.");
-    }
-
-    void OnCallPhone()
-    {
-        if (_currentDetailData == null)
-        {
-            return;
-        }
-
-        string phoneNumber = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPhoneNumber : _currentDetailData.phoneNumber;
-        if (!string.IsNullOrEmpty(phoneNumber))
-        {
-            Application.OpenURL("tel:" + phoneNumber);
-        }
-    }
-
-    void OnOpenMap()
-    {
-        if (_currentDetailData == null)
-        {
-            return;
-        }
-
-        string placeUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : _currentDetailData.placeUrl;
-        if (!string.IsNullOrEmpty(placeUrl))
-        {
-            Application.OpenURL(placeUrl);
-        }
-    }
     #endregion
 
     #region Animations
