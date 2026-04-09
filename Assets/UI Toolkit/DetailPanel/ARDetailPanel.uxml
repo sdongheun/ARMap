@@ -1,0 +1,49 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI%20Toolkit/DetailPanel/ARDetailPanel.uss?fileID=7433441132597879392&amp;guid=1b15c3ed4258444f789332d132303f90&amp;type=3#ARDetailPanel" />
+    <ui:VisualElement name="detail-overlay" class="overlay">
+        <ui:VisualElement name="detail-sheet" class="sheet">
+            <ui:ScrollView name="detail-scroll" mode="Vertical" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden" class="sheet-scroll">
+                <ui:Button name="close-button" class="close-button icon-button icon-back" />
+                <ui:VisualElement class="summary-section">
+                    <ui:Label name="detail-title" text="상세 정보" class="header-title" />
+                    <ui:VisualElement name="facility-selector-section" class="facility-selector-section">
+                        <ui:VisualElement name="facility-toggle-button" class="facility-toggle-button">
+                            <ui:VisualElement class="facility-toggle-copy">
+                                <ui:Label text="현재 장소" class="facility-toggle-label" />
+                                <ui:Label name="facility-selected-name" text="대표 장소" class="facility-selected-name" />
+                            </ui:VisualElement>
+                            <ui:VisualElement name="facility-toggle-chevron" class="facility-toggle-chevron facility-toggle-chevron-icon" />
+                        </ui:VisualElement>
+                        <ui:ScrollView name="facility-list" mode="Vertical" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="Hidden" class="facility-list" />
+                    </ui:VisualElement>
+                    <ui:Label name="detail-subtitle" text="건물 정보" class="header-subtitle" />
+                </ui:VisualElement>
+                <ui:VisualElement class="info-section">
+                    <ui:VisualElement name="address-row" class="info-row">
+                        <ui:VisualElement class="field-icon field-icon-address row-icon-image" />
+                        <ui:VisualElement class="row-body row-body-wide">
+                            <ui:Label text="주소" class="row-label" />
+                            <ui:VisualElement class="row-inline">
+                                <ui:Label name="detail-address-value" text="주소 정보가 없습니다." class="row-value multiline-value inline-value" />
+                                <ui:Button name="address-copy-button" text="복사" class="inline-text-button" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="phone-row" class="info-row">
+                        <ui:VisualElement class="field-icon field-icon-phone row-icon-image" />
+                        <ui:VisualElement class="row-body row-body-wide">
+                            <ui:Label text="전화번호" class="row-label" />
+                            <ui:VisualElement class="row-inline">
+                                <ui:Label name="detail-phone-value" text="전화번호가 없습니다." class="row-value inline-value" />
+                                <ui:Button name="phone-call-button" text="통화" class="inline-text-button" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="map-action-row" class="map-action-row">
+                        <ui:Button name="map-open-button" text="카카오맵에서 보기" class="map-open-button" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:ScrollView>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

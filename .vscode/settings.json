@@ -64,6 +64,36 @@
         "*.prefab": "yaml",
         "*.unity": "yaml"
     },
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/.vs/**": true,
+        "**/Library/**": true,
+        "**/Temp/**": true,
+        "**/Logs/**": true,
+        "**/Obj/**": true,
+        "**/obj/**": true,
+        "**/Build/**": true,
+        "**/build/**": true,
+        "**/Builds/**": true,
+        "**/ios_build/**": true,
+        "**/Pods/**": true,
+        "**/DerivedData/**": true
+    },
+    "search.exclude": {
+        "**/.git": true,
+        "**/.vs": true,
+        "**/Library": true,
+        "**/Temp": true,
+        "**/Logs": true,
+        "**/Obj": true,
+        "**/obj": true,
+        "**/Build": true,
+        "**/build": true,
+        "**/Builds": true,
+        "**/ios_build": true,
+        "**/Pods": true,
+        "**/DerivedData": true
+    },
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj"
