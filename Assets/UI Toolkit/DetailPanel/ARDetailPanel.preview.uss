@@ -1,0 +1,9 @@
+.overlay {
+    opacity: 1;
+    background-color: rgba(245, 242, 238, 1);
+}
+
+.sheet {
+    translate: 0 0;
+    opacity: 1;
+}

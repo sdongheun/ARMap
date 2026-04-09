@@ -1,0 +1,399 @@
+:root {
+    color: rgb(30, 29, 27);
+}
+
+.overlay {
+    width: 100%;
+    height: 100%;
+    background-color: rgba(245, 242, 238, 0);
+    opacity: 0;
+    transition-property: opacity, background-color;
+    transition-duration: 0.32s;
+    transition-timing-function: ease-out;
+}
+
+.overlay.open,
+.overlay.preview-mode,
+.preview-mode .overlay {
+    opacity: 1;
+    background-color: white;
+}
+
+.sheet {
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    translate: 0 100%;
+    opacity: 0;
+    transition-property: translate, opacity;
+    transition-duration: 0.36s;
+    transition-timing-function: ease-in-out;
+}
+
+.sheet.open,
+.sheet.preview-mode,
+.preview-mode .sheet {
+    translate: 0 0;
+    opacity: 1;
+}
+
+.sheet-scroll {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.sheet-scroll > .unity-scroll-view__vertical-scroller,
+.sheet-scroll > .unity-scroll-view__horizontal-scroller,
+.sheet-scroll > .unity-scroller--vertical,
+.sheet-scroll > .unity-scroller--horizontal {
+    display: none;
+    width: 0;
+    opacity: 0;
+}
+
+.sheet-scroll > .unity-scroll-view__content-container {
+    padding-bottom: 28px;
+}
+
+.close-button {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    margin-top: 20px;
+    margin-left: 20px;
+    margin-bottom: 8px;
+    background-color: rgba(255, 255, 255, 0.86);
+    color: rgb(33, 31, 29);
+    font-size: 13px;
+    -unity-text-align: middle-center;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.icon-button {
+    -unity-background-scale-mode: scale-to-fit;
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.icon-back {
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/down-chevron-svgrepo-com.png?fileID=2800000&guid=216fe9b6d2a340d3bd7f6b55293306b0&type=3#down-chevron-svgrepo-com");
+}
+
+.summary-section {
+    display: flex;
+    flex-direction: column;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-top: 6px;
+    padding-bottom: 10px;
+}
+
+.header-title {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(21, 20, 18);
+    margin-bottom: 2px;
+    white-space: normal;
+}
+
+.header-subtitle {
+    font-size: 7px;
+    color: rgb(117, 110, 102);
+    margin-bottom: 8px;
+}
+
+.facility-selector-section {
+    display: none;
+    flex-direction: column;
+    margin-top: 2px;
+    margin-bottom: 8px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+    background-color: rgb(247, 242, 235);
+    overflow: hidden;
+}
+
+.facility-toggle-button {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    background-color: rgba(255, 255, 255, 0);
+}
+
+.facility-toggle-copy {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.facility-toggle-label {
+    font-size: 5px;
+    color: rgb(134, 127, 119);
+    margin-bottom: 2px;
+}
+
+.facility-selected-name {
+    font-size: 8px;
+    color: rgb(29, 27, 25);
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.facility-toggle-chevron {
+    margin-left: 10px;
+    min-width: 14px;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.facility-toggle-chevron-icon {
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/down-chevron-svgrepo-com.png?fileID=2800000&guid=216fe9b6d2a340d3bd7f6b55293306b0&type=3#down-chevron-svgrepo-com");
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.facility-toggle-chevron-icon--expanded {
+    rotate: 180deg;
+}
+
+.facility-list {
+    display: none;
+    flex-direction: column;
+    max-height: 88px;
+    border-top-width: 1px;
+    border-top-color: rgb(232, 223, 214);
+}
+
+.facility-list > .unity-scroll-view__content-container {
+    flex-direction: column;
+}
+
+.facility-list > .unity-scroll-view__vertical-scroller,
+.facility-list > .unity-scroll-view__horizontal-scroller,
+.facility-list > .unity-scroller--vertical,
+.facility-list > .unity-scroller--horizontal {
+    display: none;
+    width: 0;
+    opacity: 0;
+}
+
+.facility-list-item {
+    display: flex;
+    flex-direction: column;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(235, 226, 217);
+    background-color: rgba(255, 255, 255, 0);
+}
+
+.facility-list-item:last-child {
+    border-bottom-width: 0;
+}
+
+.facility-list-item--selected {
+    background-color: rgb(241, 234, 225);
+}
+
+.facility-list-item-name {
+    font-size: 7px;
+    color: rgb(29, 27, 25);
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.facility-list-item-category {
+    margin-top: 2px;
+    font-size: 5px;
+    color: rgb(124, 117, 109);
+    white-space: normal;
+}
+
+.info-section {
+    margin-left: 24px;
+    margin-right: 24px;
+    padding-top: 4px;
+    border-top-width: 1px;
+    border-top-color: rgb(227, 220, 212);
+}
+
+.info-row {
+    flex-direction: row;
+    align-items: flex-start;
+    padding-top: 11px;
+    padding-bottom: 11px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(231, 224, 216);
+}
+
+.map-action-row {
+    display: flex;
+    padding-top: 18px;
+    padding-bottom: 8px;
+}
+
+.map-open-button {
+    width: 100%;
+    min-height: 46px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background-color: rgb(255, 232, 46);
+    color: rgb(36, 32, 22);
+    font-size: 7px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    unity-background-image-tint-color: white;
+    box-shadow: 0 10px 22px rgba(185, 164, 0, 0.22);
+}
+
+.map-open-button:disabled {
+    opacity: 0.45;
+}
+
+.row-icon {
+    width: 20px;
+    min-width: 20px;
+    margin-right: 10px;
+    margin-top: 2px;
+    font-size: 8px;
+    color: rgb(151, 144, 136);
+}
+
+.row-icon-image {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.row-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    justify-content: center;
+    min-width: 0;
+}
+
+.row-body-wide {
+    margin-right: 12px;
+}
+
+.row-inline {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.row-label {
+    font-size: 5px;
+    color: rgb(134, 127, 119);
+    margin-bottom: 2px;
+}
+
+.row-value {
+    font-size: 7px;
+    color: rgb(29, 27, 25);
+    -unity-font-style: bold;
+    white-space: normal;
+    flex-shrink: 1;
+}
+
+.multiline-value {
+    -unity-text-align: upper-left;
+    white-space: normal;
+}
+
+.inline-value {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.inline-text-button {
+    height: auto;
+    min-width: auto;
+    flex-shrink: 0;
+    align-self: center;
+    background-color: rgba(255, 255, 255, 0);
+    color: rgb(131, 125, 118);
+    font-size: 6px;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    text-decoration: underline;
+}
+
+.field-icon {
+    width: 18px;
+    height: 18px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.field-icon-address {
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/marker-pin-01-svgrepo-com%20(1).png?fileID=2800000&guid=0a9192c35d704568a5a4a45f5fb60b77&type=3#marker-pin-01-svgrepo-com%20(1)");
+}
+
+.field-icon-clock {
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/clock-three-svgrepo-com%20(1).png?fileID=2800000&guid=601e5394c77b4189af2e2246b85b5e0e&type=3#clock-three-svgrepo-com%20(1)");
+}
+
+.field-icon-phone {
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/call-medicine-svgrepo-com.png?fileID=2800000&guid=4ef3e0fcb0e84e75a29ad82b96fb7cb7&type=3#call-medicine-svgrepo-com");
+}
+
+.close-button:disabled,
+.inline-text-button:disabled {
+    opacity: 0.45;
+}
