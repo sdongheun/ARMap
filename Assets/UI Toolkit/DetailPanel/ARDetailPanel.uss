@@ -90,7 +90,7 @@
 
 .summary-section {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     padding-left: 24px;
     padding-right: 24px;
     padding-top: 6px;
@@ -109,6 +109,120 @@
     font-size: 7px;
     color: rgb(117, 110, 102);
     margin-bottom: 8px;
+}
+
+.facility-selector-section {
+    display: none;
+    flex-direction: column;
+    margin-top: 2px;
+    margin-bottom: 8px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+    background-color: rgb(247, 242, 235);
+    overflow: hidden;
+}
+
+.facility-toggle-button {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    background-color: rgba(255, 255, 255, 0);
+}
+
+.facility-toggle-copy {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.facility-toggle-label {
+    font-size: 5px;
+    color: rgb(134, 127, 119);
+    margin-bottom: 2px;
+}
+
+.facility-selected-name {
+    font-size: 8px;
+    color: rgb(29, 27, 25);
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.facility-toggle-chevron {
+    margin-left: 10px;
+    min-width: 14px;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.facility-toggle-chevron-icon {
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/UI%20Toolkit/DetailPanel/Icons/down-chevron-svgrepo-com.png?fileID=2800000&guid=216fe9b6d2a340d3bd7f6b55293306b0&type=3#down-chevron-svgrepo-com");
+    background-position-x: center;
+    background-position-y: center;
+    background-repeat: no-repeat;
+}
+
+.facility-toggle-chevron-icon--expanded {
+    rotate: 180deg;
+}
+
+.facility-list {
+    display: none;
+    flex-direction: column;
+    border-top-width: 1px;
+    border-top-color: rgb(232, 223, 214);
+}
+
+.facility-list-item {
+    display: flex;
+    flex-direction: column;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(235, 226, 217);
+    background-color: rgba(255, 255, 255, 0);
+}
+
+.facility-list-item:last-child {
+    border-bottom-width: 0;
+}
+
+.facility-list-item--selected {
+    background-color: rgb(241, 234, 225);
+}
+
+.facility-list-item-name {
+    font-size: 7px;
+    color: rgb(29, 27, 25);
+    -unity-font-style: bold;
+    white-space: normal;
+}
+
+.facility-list-item-category {
+    margin-top: 2px;
+    font-size: 5px;
+    color: rgb(124, 117, 109);
+    white-space: normal;
 }
 
 .info-section {

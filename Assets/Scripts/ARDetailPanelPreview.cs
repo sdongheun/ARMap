@@ -84,6 +84,30 @@ public class ARDetailPanelPreview : MonoBehaviour
         _previewData.placeUrl = previewPlaceUrl;
         _previewData.photoUrl = previewPhotoUrl;
         _previewData.secondaryPhotoUrl = previewSecondaryPhotoUrl;
+        _previewData.facilities = new System.Collections.Generic.List<FacilityInfo>
+        {
+            new FacilityInfo
+            {
+                name = previewBuildingName,
+                phone = previewPhoneNumber,
+                category = previewCategory,
+                placeUrl = previewPlaceUrl
+            },
+            new FacilityInfo
+            {
+                name = "스타벅스 인제대점",
+                phone = "055-321-9876",
+                category = "카페",
+                placeUrl = "https://place.map.kakao.com/123456"
+            },
+            new FacilityInfo
+            {
+                name = "올리브영 인제대점",
+                phone = "055-321-4567",
+                category = "생활/편의",
+                placeUrl = "https://place.map.kakao.com/234567"
+            }
+        };
 
         _controller.ShowPreview(_previewData);
     }

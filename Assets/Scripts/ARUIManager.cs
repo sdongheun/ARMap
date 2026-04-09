@@ -170,27 +170,35 @@ public class ARUIManager : MonoBehaviour
 
     Sprite CreateRoundedPanelSprite()
     {
-        const int textureSize = 64;
-        int radius = Mathf.Clamp(Mathf.RoundToInt(screenMarkerCornerRadius), 2, textureSize / 2 - 2);
+        const int textureSize = 128;
+        int radius = Mathf.Clamp(Mathf.RoundToInt(screenMarkerCornerRadius), 4, textureSize / 2 - 4);
+        const float edgeSoftness = 1.5f;
         _screenMarkerPanelTexture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
         _screenMarkerPanelTexture.name = "ScreenMarkerPanelTexture";
         _screenMarkerPanelTexture.wrapMode = TextureWrapMode.Clamp;
         _screenMarkerPanelTexture.filterMode = FilterMode.Bilinear;
 
         Color32[] pixels = new Color32[textureSize * textureSize];
-        float innerMin = radius - 1f;
-        float radiusSq = radius * radius;
+        float halfSize = textureSize * 0.5f;
+        float innerHalfExtent = halfSize - radius;
 
         for (int y = 0; y < textureSize; y++)
         {
             for (int x = 0; x < textureSize; x++)
             {
-                float nearestX = Mathf.Clamp(x, radius, textureSize - radius - 1);
-                float nearestY = Mathf.Clamp(y, radius, textureSize - radius - 1);
-                float dx = x - nearestX;
-                float dy = y - nearestY;
-                bool inside = (dx * dx + dy * dy) <= radiusSq || (Mathf.Abs(dx) < 0.01f && Mathf.Abs(dy) < 0.01f);
-                pixels[(y * textureSize) + x] = inside ? new Color32(255, 255, 255, 255) : new Color32(255, 255, 255, 0);
+                float sampleX = (x + 0.5f) - halfSize;
+                float sampleY = (y + 0.5f) - halfSize;
+
+                float qx = Mathf.Abs(sampleX) - innerHalfExtent;
+                float qy = Mathf.Abs(sampleY) - innerHalfExtent;
+                float outsideX = Mathf.Max(qx, 0f);
+                float outsideY = Mathf.Max(qy, 0f);
+                float outsideDistance = Mathf.Sqrt((outsideX * outsideX) + (outsideY * outsideY));
+                float insideDistance = Mathf.Min(Mathf.Max(qx, qy), 0f);
+                float signedDistance = outsideDistance + insideDistance - radius;
+                float alpha = Mathf.Clamp01(0.5f - (signedDistance / edgeSoftness));
+
+                pixels[(y * textureSize) + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
             }
         }
 
@@ -1177,9 +1185,14 @@ public class ARUIManager : MonoBehaviour
         }
 
         List<string> parts = new List<string>();
+        string selectedPlaceName = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceName : string.Empty;
+        string selectedPlaceUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : string.Empty;
+
         if (!string.IsNullOrEmpty(_currentDetailData.buildingName)) parts.Add(_currentDetailData.buildingName);
+        if (!string.IsNullOrEmpty(selectedPlaceName) && selectedPlaceName != _currentDetailData.buildingName) parts.Add(selectedPlaceName);
         if (!string.IsNullOrEmpty(_currentDetailData.fetchedAddress)) parts.Add(_currentDetailData.fetchedAddress);
-        if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
+        if (!string.IsNullOrEmpty(selectedPlaceUrl)) parts.Add(selectedPlaceUrl);
+        else if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
 
         if (parts.Count == 0)
         {
@@ -1190,8 +1203,33 @@ public class ARUIManager : MonoBehaviour
         ShowToast("건물 정보가 복사되었습니다.");
     }
 
-    void OnCallPhone() { if (_currentDetailData != null && !string.IsNullOrEmpty(_currentDetailData.phoneNumber)) Application.OpenURL("tel:" + _currentDetailData.phoneNumber); }
-    void OnOpenMap() { if (_currentDetailData != null && !string.IsNullOrEmpty(_currentDetailData.placeUrl)) Application.OpenURL(_currentDetailData.placeUrl); }
+    void OnCallPhone()
+    {
+        if (_currentDetailData == null)
+        {
+            return;
+        }
+
+        string phoneNumber = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPhoneNumber : _currentDetailData.phoneNumber;
+        if (!string.IsNullOrEmpty(phoneNumber))
+        {
+            Application.OpenURL("tel:" + phoneNumber);
+        }
+    }
+
+    void OnOpenMap()
+    {
+        if (_currentDetailData == null)
+        {
+            return;
+        }
+
+        string placeUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : _currentDetailData.placeUrl;
+        if (!string.IsNullOrEmpty(placeUrl))
+        {
+            Application.OpenURL(placeUrl);
+        }
+    }
     #endregion
 
     #region Animations
