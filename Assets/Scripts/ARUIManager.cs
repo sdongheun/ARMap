@@ -15,6 +15,7 @@ public class ARUIManager : MonoBehaviour
         public string label;
         public string category;
         public string address;
+        public float distanceMeters;
         public Vector2 screenPosition;
         public bool isSelected;
     }
@@ -120,6 +121,10 @@ public class ARUIManager : MonoBehaviour
     public Vector2 screenMarkerShadowOffset = new Vector2(0f, -10f);
     public float screenMarkerShadowExpansion = 10f;
     public Color screenMarkerShadowColor = new Color(0.08f, 0.12f, 0.2f, 0.22f);
+    public float screenMarkerScaleNearDistance = 5f;
+    public float screenMarkerScaleFarDistance = 50f;
+    public float screenMarkerScaleNearMultiplier = 1.24f;
+    public float screenMarkerScaleFarMultiplier = 0.84f;
 
     // --- Internal Variables ---
     public event Action OnClickDetail;
@@ -379,14 +384,15 @@ public class ARUIManager : MonoBehaviour
             ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
             view.root.SetActive(true);
             view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
-            float pinSize = data.isSelected ? 72f : 60f;
+            float pinSize = (data.isSelected ? 72f : 60f) * GetScreenMarkerDistanceScale(data.distanceMeters);
             if (view.pinRect != null)
             {
                 view.pinRect.sizeDelta = new Vector2(pinSize, pinSize);
             }
             if (view.pinShadowRect != null)
             {
-                view.pinShadowRect.sizeDelta = new Vector2(pinSize + 10f, pinSize + 10f);
+                float shadowSize = pinSize + (10f * GetScreenMarkerDistanceScale(data.distanceMeters));
+                view.pinShadowRect.sizeDelta = new Vector2(shadowSize, shadowSize);
             }
             if (view.pinShadowImage != null)
             {
@@ -417,6 +423,19 @@ public class ARUIManager : MonoBehaviour
                 pair.Value.root.SetActive(activeIds.Contains(pair.Key));
             }
         }
+    }
+
+    float GetScreenMarkerDistanceScale(float distanceMeters)
+    {
+        if (distanceMeters <= 0f)
+        {
+            return 1f;
+        }
+
+        float nearDistance = Mathf.Max(0.01f, screenMarkerScaleNearDistance);
+        float farDistance = Mathf.Max(nearDistance + 0.01f, screenMarkerScaleFarDistance);
+        float t = Mathf.InverseLerp(nearDistance, farDistance, distanceMeters);
+        return Mathf.Lerp(screenMarkerScaleNearMultiplier, screenMarkerScaleFarMultiplier, t);
     }
 
     public void ClearScreenMarkers()
