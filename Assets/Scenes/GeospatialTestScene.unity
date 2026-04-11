@@ -331,7 +331,6 @@ MonoBehaviour:
   iconBuilding: {fileID: 21300000, guid: a8ac6e8b8876421e8127e2f9a9eb1f75, type: 3}
   screenMarkerDefaultSprite: {fileID: 21300000, guid: b3858b3df6b94dd7a5d3dfffe0064a67, type: 3}
   screenMarkerSelectedSprite: {fileID: 21300000, guid: 905704979cc24204bd23383b34443008, type: 3}
-  screenMarkerBubbleSprite: {fileID: 21300000, guid: 340820b32705d49fc9650a28a40f503b, type: 3}
   uiToolkitDetailPanel: {fileID: 645173700}
   animDuration: 0.3
   slideOffset: 150
@@ -350,9 +349,27 @@ MonoBehaviour:
   remainingDistanceText: {fileID: 0}
   nextGuideText: {fileID: 0}
   stopNavigationButton: {fileID: 0}
+  recalibrateButton: {fileID: 0}
   offScreenIndicator: {fileID: 0}
   mainNavigateButton: {fileID: 0}
   detailNavigateButton: {fileID: 0}
+  showCenterReticle: 1
+  centerReticleColor: {r: 1, g: 1, b: 1, a: 0.72}
+  centerReticleBarLength: 16
+  centerReticleBarThickness: 3
+  centerReticleGap: 10
+  centerReticlePulseDuration: 2.2
+  centerReticlePulseAlphaMin: 0.32
+  centerReticlePulseAlphaMax: 0.72
+  centerReticlePulseScale: 1.04
+  screenMarkerCornerRadius: 18
+  screenMarkerShadowOffset: {x: 0, y: -10}
+  screenMarkerShadowExpansion: 10
+  screenMarkerShadowColor: {r: 0.08, g: 0.12, b: 0.2, a: 0.22}
+  screenMarkerScaleNearDistance: 5
+  screenMarkerScaleFarDistance: 50
+  screenMarkerScaleNearMultiplier: 1.24
+  screenMarkerScaleFarMultiplier: 0.84
 --- !u!114 &104506283
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -748,6 +765,7 @@ MonoBehaviour:
   kakaoRestApiKey: 
   searchRadius: 100
   clusterRadius: 20
+  institutionalFacilityAssignmentRadius: 45
   categoryCodes:
   - MT1
   - CS2
@@ -778,21 +796,37 @@ MonoBehaviour:
   - "\uC778\uC81C\uB300 \uC6D0\uB8F8"
   - "\uC778\uC81C\uB300 \uC220\uC9D1"
   buildingMarkerPrefab: {fileID: 1601110663320009772, guid: 3fbbe2e020d2d4261a1612ea01e812eb, type: 3}
-  showNearbyAnchors: 0
+  showNearbyAnchors: 1
+  debugForceShowAllWorldMarkers: 0
+  debugPlaceWorldMarkersInFrontOfCamera: 0
+  debugFrontMarkerDistance: 2.5
+  debugFrontMarkerHeightOffset: -0.2
+  debugFrontMarkerHorizontalSpacing: 0.7
   anchorPreviewRadius: 180
   maxPreviewAnchors: 10
+  anchorCreationRadius: 80
+  maxWorldTextMarkers: 5
+  anchorCreateYieldInterval: 1
+  enableWorldTextMarker: 1
+  markerRenderMode: 1
+  markerAltitudeOffsetMeters: 2
+  worldMarkerLocalOffsetMeters: 0
+  elevationBatchSize: 20
+  showAnchorResolveDebugOverlay: 0
+  maxAnchorDebugLines: 10
+  anchorTrackingWaitSeconds: 20
   markerHeightOffset: 12
   markerHeightOffsetNear: 2.5
   markerHeightOffsetFar: 7
   markerHeightNearDistance: 15
   markerHeightFarDistance: 120
-  showScreenSpaceMarkers: 1
+  showScreenSpaceMarkers: 0
   screenMarkerHeightOffsetNear: 5
   screenMarkerHeightOffsetFar: 12
   screenMarkerHeightNearDistance: 15
   screenMarkerHeightFarDistance: 120
   screenMarkerCameraHeightOffset: 0
-  showWorldSpaceInfoMarker: 1
+  showWorldSpaceInfoMarker: 0
   infoMarkerLerp: 0.6
   infoMarkerMinDistance: 8
   infoMarkerMaxDistance: 30

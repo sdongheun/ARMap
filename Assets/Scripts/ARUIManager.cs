@@ -162,6 +162,8 @@ public class ARUIManager : MonoBehaviour
     private Canvas _canvas;
     private RectTransform _screenMarkerRoot;
     private RectTransform _centerReticleRoot;
+    private RectTransform _debugOverlayRoot;
+    private TextMeshProUGUI _debugOverlayText;
     private Sprite _screenMarkerPanelSprite;
     private Texture2D _screenMarkerPanelTexture;
     private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
@@ -493,6 +495,90 @@ public class ARUIManager : MonoBehaviour
 
         _centerReticleRoot.gameObject.SetActive(true);
         _centerReticleRoot.SetAsLastSibling();
+    }
+
+    void EnsureDebugOverlay()
+    {
+        if (_debugOverlayRoot != null) return;
+
+        GameObject rootObject = new GameObject("DebugOverlay", typeof(RectTransform), typeof(Image));
+        rootObject.transform.SetParent(transform, false);
+        _debugOverlayRoot = rootObject.GetComponent<RectTransform>();
+        _debugOverlayRoot.anchorMin = new Vector2(0f, 1f);
+        _debugOverlayRoot.anchorMax = new Vector2(0f, 1f);
+        _debugOverlayRoot.pivot = new Vector2(0f, 1f);
+        _debugOverlayRoot.anchoredPosition = new Vector2(24f, -180f);
+        _debugOverlayRoot.sizeDelta = new Vector2(560f, 220f);
+
+        Image background = rootObject.GetComponent<Image>();
+        background.color = new Color(0.05f, 0.08f, 0.12f, 0.72f);
+        background.raycastTarget = false;
+
+        GameObject textObject = new GameObject("DebugText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(rootObject.transform, false);
+
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(18f, 18f);
+        textRect.offsetMax = new Vector2(-18f, -18f);
+
+        _debugOverlayText = textObject.GetComponent<TextMeshProUGUI>();
+        _debugOverlayText.fontSize = 20f;
+        _debugOverlayText.enableWordWrapping = true;
+        _debugOverlayText.color = new Color(0.92f, 0.97f, 1f, 1f);
+        _debugOverlayText.alignment = TextAlignmentOptions.TopLeft;
+        _debugOverlayText.raycastTarget = false;
+        _debugOverlayText.text = string.Empty;
+
+        TMP_FontAsset fallbackFont = null;
+        if (quickBuildingNameText != null && quickBuildingNameText.font != null)
+        {
+            fallbackFont = quickBuildingNameText.font;
+        }
+        else if (TMP_Settings.instance != null && TMP_Settings.defaultFontAsset != null)
+        {
+            fallbackFont = TMP_Settings.defaultFontAsset;
+        }
+
+        if (fallbackFont != null)
+        {
+            _debugOverlayText.font = fallbackFont;
+        }
+
+        _debugOverlayRoot.gameObject.SetActive(false);
+        _debugOverlayRoot.SetAsLastSibling();
+    }
+
+    public void SetDebugOverlay(string message)
+    {
+        EnsureDebugOverlay();
+
+        if (_debugOverlayRoot == null || _debugOverlayText == null)
+        {
+            return;
+        }
+
+        bool visible = !string.IsNullOrWhiteSpace(message);
+        _debugOverlayRoot.gameObject.SetActive(visible);
+        if (visible)
+        {
+            _debugOverlayText.text = message;
+            _debugOverlayRoot.SetAsLastSibling();
+        }
+    }
+
+    public void ClearDebugOverlay()
+    {
+        if (_debugOverlayRoot != null)
+        {
+            _debugOverlayRoot.gameObject.SetActive(false);
+        }
+
+        if (_debugOverlayText != null)
+        {
+            _debugOverlayText.text = string.Empty;
+        }
     }
 
     void CreateCenterReticleBar(string name, Vector2 anchor, Vector2 pivot, Vector2 anchoredPosition, bool horizontal)
