@@ -353,6 +353,7 @@ MonoBehaviour:
   offScreenIndicator: {fileID: 0}
   mainNavigateButton: {fileID: 0}
   detailNavigateButton: {fileID: 0}
+  worldInfoDetailButton: {fileID: 0}
   showCenterReticle: 1
   centerReticleColor: {r: 1, g: 1, b: 1, a: 0.72}
   centerReticleBarLength: 16
@@ -802,17 +803,19 @@ MonoBehaviour:
   debugFrontMarkerDistance: 2.5
   debugFrontMarkerHeightOffset: -0.2
   debugFrontMarkerHorizontalSpacing: 0.7
-  anchorPreviewRadius: 180
+  anchorPreviewRadius: 250
   maxPreviewAnchors: 10
-  anchorCreationRadius: 80
+  anchorCreationRadius: 150
   maxWorldTextMarkers: 5
   anchorCreateYieldInterval: 1
+  textCreateYieldInterval: 1
+  selectedAnchorCreateDelay: 0.1
   enableWorldTextMarker: 1
   markerRenderMode: 1
   markerAltitudeOffsetMeters: 2
   worldMarkerLocalOffsetMeters: 0
   elevationBatchSize: 20
-  showAnchorResolveDebugOverlay: 0
+  showAnchorResolveDebugOverlay: 1
   maxAnchorDebugLines: 10
   anchorTrackingWaitSeconds: 20
   markerHeightOffset: 12
@@ -831,10 +834,10 @@ MonoBehaviour:
   infoMarkerMinDistance: 8
   infoMarkerMaxDistance: 30
   detectionRadius: 100
-  detectionAngle: 30
+  detectionAngle: 90
   verticalAngleLimit: 45
   refreshDistance: 80
-  centerViewportThreshold: 0.12
+  centerViewportThreshold: 0.32
   forwardGroupViewportThreshold: 0.08
   groupedCandidateDistanceBias: 3
   isNavigationActive: 0

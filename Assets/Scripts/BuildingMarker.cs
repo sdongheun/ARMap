@@ -13,12 +13,13 @@ public class BuildingMarker : MonoBehaviour
 
     [Header("Text Marker")]
     public float hiddenScale = 0.0f;
-    public float previewScale = 0.18f;
-    public float activeScale = 0.26f;
+    public float previewScale = 0.36f;
+    public float activeScale = 0.54f;
     public float animSpeed = 8.0f;
     public float labelHeight = 1.4f;
-    public float titleFontSize = 4.2f;
-    public float subtitleFontSize = 2.4f;
+    public float titleFontSize = 8.7f;
+    public float subtitleFontSize = 4.8f;
+    public Vector2 buttonPlateSize = new Vector2(10.8f, 4.5f);
     public TMP_FontAsset fontAssetOverride;
     public Material fontMaterialOverride;
     public Color hiddenColor = new Color(1f, 1f, 1f, 0f);
@@ -36,9 +37,12 @@ public class BuildingMarker : MonoBehaviour
     private MarkerVisualState _currentState = MarkerVisualState.Hidden;
     private bool _isInfoVisible;
     private Transform _cachedCameraTransform;
-    private const float DefaultPreviewTextScale = 0.18f;
-    private const float DefaultActiveTextScale = 0.26f;
-    private const float LegacyScaleThreshold = 0.6f;
+    private Renderer _buttonPlateRenderer;
+    private Material _buttonPlateMaterial;
+    private BoxCollider _hitCollider;
+    private BuildingData _boundBuilding;
+    private const float DefaultPreviewTextScale = 0.36f;
+    private const float DefaultActiveTextScale = 0.54f;
 
     void Awake()
     {
@@ -97,8 +101,60 @@ public class BuildingMarker : MonoBehaviour
         _visualRoot.localRotation = Quaternion.identity;
         _visualRoot.localScale = Vector3.one;
 
+        CreateButtonPlate(_visualRoot);
         _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 0.28f, 0f), titleFontSize, FontStyles.Bold);
         _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, -0.18f, 0f), subtitleFontSize, FontStyles.Normal);
+        EnsureHitCollider();
+    }
+
+    void CreateButtonPlate(Transform parent)
+    {
+        GameObject plateObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        plateObject.name = "ButtonPlate";
+        plateObject.transform.SetParent(parent, false);
+        plateObject.transform.localPosition = new Vector3(0f, 0.03f, 0.08f);
+        plateObject.transform.localRotation = Quaternion.identity;
+        plateObject.transform.localScale = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 0.08f);
+
+        Collider plateCollider = plateObject.GetComponent<Collider>();
+        if (plateCollider != null)
+        {
+            Destroy(plateCollider);
+        }
+
+        _buttonPlateRenderer = plateObject.GetComponent<Renderer>();
+        if (_buttonPlateRenderer != null)
+        {
+            Shader shader = Shader.Find("Unlit/Color");
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            if (shader != null)
+            {
+                _buttonPlateMaterial = new Material(shader);
+                _buttonPlateRenderer.material = _buttonPlateMaterial;
+            }
+
+            _buttonPlateRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            _buttonPlateRenderer.receiveShadows = false;
+            _buttonPlateRenderer.lightProbeUsage = LightProbeUsage.Off;
+            _buttonPlateRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        }
+    }
+
+    void EnsureHitCollider()
+    {
+        _hitCollider = GetComponent<BoxCollider>();
+        if (_hitCollider == null)
+        {
+            _hitCollider = gameObject.AddComponent<BoxCollider>();
+        }
+
+        _hitCollider.center = new Vector3(0f, labelHeight + 0.05f, 0.05f);
+        _hitCollider.size = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 0.4f);
+        _hitCollider.enabled = false;
     }
 
     TextMeshPro CreateTextNode(string objectName, Transform parent, Vector3 localPosition, float fontSize, FontStyles fontStyle)
@@ -195,6 +251,17 @@ public class BuildingMarker : MonoBehaviour
             Color subtitleColor = new Color(color.r, color.g, color.b, Mathf.Clamp01(color.a * 0.9f));
             _subtitleText.color = subtitleColor;
         }
+
+        if (_buttonPlateMaterial != null)
+        {
+            float panelAlpha = Mathf.Clamp01(color.a * 0.78f);
+            _buttonPlateMaterial.color = new Color(0.06f, 0.09f, 0.14f, panelAlpha);
+        }
+
+        if (_hitCollider != null)
+        {
+            _hitCollider.enabled = visible && _isInfoVisible;
+        }
     }
 
     public void SetState(MarkerVisualState state, bool immediate = false)
@@ -245,11 +312,6 @@ public class BuildingMarker : MonoBehaviour
             return fallbackValue;
         }
 
-        if (configuredValue > LegacyScaleThreshold)
-        {
-            return fallbackValue;
-        }
-
         return configuredValue;
     }
 
@@ -269,14 +331,14 @@ public class BuildingMarker : MonoBehaviour
         RefreshText();
     }
 
-    public void SetInfoWorldPosition(Vector3 worldPosition)
+    public void BindBuilding(BuildingData building)
     {
-        if (_visualRoot == null)
-        {
-            return;
-        }
+        _boundBuilding = building;
+    }
 
-        _visualRoot.position = worldPosition;
+    public BuildingData GetBoundBuilding()
+    {
+        return _boundBuilding;
     }
 
     public void SetInfoVisible(bool visible)
@@ -298,6 +360,11 @@ public class BuildingMarker : MonoBehaviour
         if (_visualRoot != null)
         {
             _visualRoot.gameObject.SetActive(visible);
+        }
+
+        if (_hitCollider != null)
+        {
+            _hitCollider.enabled = visible && _currentState != MarkerVisualState.Hidden;
         }
         _isInfoVisible = visible;
     }

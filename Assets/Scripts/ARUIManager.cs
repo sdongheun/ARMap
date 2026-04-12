@@ -107,6 +107,7 @@ public class ARUIManager : MonoBehaviour
     [Header("12. Navigation Buttons")]
     public Button mainNavigateButton;
     public Button detailNavigateButton;
+    public Button worldInfoDetailButton;
     [Header("8. Center Reticle")]
     public bool showCenterReticle = true;
     public Color centerReticleColor = new Color(1f, 1f, 1f, 0.72f);
@@ -134,7 +135,6 @@ public class ARUIManager : MonoBehaviour
     public event Action<BuildingData> OnNavigateFromDetailRequested;
     public event Action OnStopNavigationRequested;
     public event Action OnRecalibrateRequested;
-    private bool _isNavigationMode;
     private bool _stopButtonBound;
     private bool _recalibrateButtonBound;
 
@@ -163,11 +163,16 @@ public class ARUIManager : MonoBehaviour
     private RectTransform _screenMarkerRoot;
     private RectTransform _centerReticleRoot;
     private RectTransform _debugOverlayRoot;
+    private ScrollRect _debugOverlayScrollRect;
+    private RectTransform _debugOverlayContent;
     private TextMeshProUGUI _debugOverlayText;
+    private Image _worldInfoDetailButtonImage;
+    private TextMeshProUGUI _worldInfoDetailButtonText;
     private Sprite _screenMarkerPanelSprite;
     private Texture2D _screenMarkerPanelTexture;
     private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
     private string _lastQuickInfoId;
+    private BuildingData _worldInfoButtonData;
     private TextMeshProUGUI quickTitleText => quickBuildingNameText;
 
     void Awake()
@@ -232,6 +237,7 @@ public class ARUIManager : MonoBehaviour
 
         EnsureScreenMarkerRoot();
         EnsureNavigationButton();
+        EnsureWorldInfoDetailButton();
         InitializeQuickInfoCard(false);
 
         EnsureScreenMarkerRoot();
@@ -501,7 +507,7 @@ public class ARUIManager : MonoBehaviour
     {
         if (_debugOverlayRoot != null) return;
 
-        GameObject rootObject = new GameObject("DebugOverlay", typeof(RectTransform), typeof(Image));
+        GameObject rootObject = new GameObject("DebugOverlay", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
         rootObject.transform.SetParent(transform, false);
         _debugOverlayRoot = rootObject.GetComponent<RectTransform>();
         _debugOverlayRoot.anchorMin = new Vector2(0f, 1f);
@@ -512,20 +518,50 @@ public class ARUIManager : MonoBehaviour
 
         Image background = rootObject.GetComponent<Image>();
         background.color = new Color(0.05f, 0.08f, 0.12f, 0.72f);
-        background.raycastTarget = false;
+        background.raycastTarget = true;
+
+        _debugOverlayScrollRect = rootObject.GetComponent<ScrollRect>();
+        _debugOverlayScrollRect.horizontal = false;
+        _debugOverlayScrollRect.vertical = true;
+        _debugOverlayScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        _debugOverlayScrollRect.scrollSensitivity = 30f;
+
+        GameObject viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+        viewportObject.transform.SetParent(rootObject.transform, false);
+
+        RectTransform viewportRect = viewportObject.GetComponent<RectTransform>();
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = new Vector2(18f, 18f);
+        viewportRect.offsetMax = new Vector2(-18f, -18f);
+
+        Image viewportImage = viewportObject.GetComponent<Image>();
+        viewportImage.color = new Color(0f, 0f, 0f, 0f);
+        viewportImage.raycastTarget = true;
+
+        GameObject contentObject = new GameObject("Content", typeof(RectTransform));
+        contentObject.transform.SetParent(viewportObject.transform, false);
+        _debugOverlayContent = contentObject.GetComponent<RectTransform>();
+        _debugOverlayContent.anchorMin = new Vector2(0f, 1f);
+        _debugOverlayContent.anchorMax = new Vector2(1f, 1f);
+        _debugOverlayContent.pivot = new Vector2(0.5f, 1f);
+        _debugOverlayContent.anchoredPosition = Vector2.zero;
+        _debugOverlayContent.sizeDelta = Vector2.zero;
 
         GameObject textObject = new GameObject("DebugText", typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(rootObject.transform, false);
+        textObject.transform.SetParent(contentObject.transform, false);
 
         RectTransform textRect = textObject.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(18f, 18f);
-        textRect.offsetMax = new Vector2(-18f, -18f);
+        textRect.anchorMin = new Vector2(0f, 1f);
+        textRect.anchorMax = new Vector2(1f, 1f);
+        textRect.pivot = new Vector2(0.5f, 1f);
+        textRect.anchoredPosition = Vector2.zero;
+        textRect.sizeDelta = new Vector2(0f, 0f);
 
         _debugOverlayText = textObject.GetComponent<TextMeshProUGUI>();
         _debugOverlayText.fontSize = 20f;
         _debugOverlayText.enableWordWrapping = true;
+        _debugOverlayText.overflowMode = TextOverflowModes.Overflow;
         _debugOverlayText.color = new Color(0.92f, 0.97f, 1f, 1f);
         _debugOverlayText.alignment = TextAlignmentOptions.TopLeft;
         _debugOverlayText.raycastTarget = false;
@@ -546,6 +582,9 @@ public class ARUIManager : MonoBehaviour
             _debugOverlayText.font = fallbackFont;
         }
 
+        _debugOverlayScrollRect.viewport = viewportRect;
+        _debugOverlayScrollRect.content = _debugOverlayContent;
+
         _debugOverlayRoot.gameObject.SetActive(false);
         _debugOverlayRoot.SetAsLastSibling();
     }
@@ -564,6 +603,23 @@ public class ARUIManager : MonoBehaviour
         if (visible)
         {
             _debugOverlayText.text = message;
+            _debugOverlayText.ForceMeshUpdate();
+            Vector2 preferredSize = _debugOverlayText.GetPreferredValues(
+                message,
+                Mathf.Max(0f, _debugOverlayRoot.sizeDelta.x - 36f),
+                0f);
+
+            if (_debugOverlayContent != null)
+            {
+                _debugOverlayContent.sizeDelta = new Vector2(0f, preferredSize.y);
+            }
+
+            if (_debugOverlayScrollRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _debugOverlayScrollRect.verticalNormalizedPosition = 0f;
+            }
+
             _debugOverlayRoot.SetAsLastSibling();
         }
     }
@@ -578,6 +634,11 @@ public class ARUIManager : MonoBehaviour
         if (_debugOverlayText != null)
         {
             _debugOverlayText.text = string.Empty;
+        }
+
+        if (_debugOverlayContent != null)
+        {
+            _debugOverlayContent.sizeDelta = Vector2.zero;
         }
     }
 
@@ -1265,6 +1326,34 @@ public class ARUIManager : MonoBehaviour
     }
 
     #region Detail View Control
+    public void SetWorldInfoDetailButtonState(BuildingData data, bool active)
+    {
+        EnsureWorldInfoDetailButton();
+
+        _worldInfoButtonData = active ? data : null;
+
+        if (worldInfoDetailButton == null)
+        {
+            return;
+        }
+
+        worldInfoDetailButton.interactable = active && data != null;
+
+        if (_worldInfoDetailButtonImage != null)
+        {
+            _worldInfoDetailButtonImage.color = worldInfoDetailButton.interactable
+                ? new Color(0.08f, 0.78f, 0.96f, 1f)
+                : new Color(0.28f, 0.32f, 0.38f, 0.9f);
+        }
+
+        if (_worldInfoDetailButtonText != null)
+        {
+            _worldInfoDetailButtonText.color = worldInfoDetailButton.interactable
+                ? Color.white
+                : new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        }
+    }
+
     public void OpenDetailView(BuildingData data)
     {
         if (uiToolkitDetailPanel == null)
@@ -2265,6 +2354,60 @@ public class ARUIManager : MonoBehaviour
         mainNavigateButton.onClick.AddListener(() => OnNavigateRequested?.Invoke());
     }
 
+    void EnsureWorldInfoDetailButton()
+    {
+        if (worldInfoDetailButton != null)
+        {
+            worldInfoDetailButton.gameObject.SetActive(true);
+            return;
+        }
+
+        GameObject btnObj = new GameObject("WorldInfoDetailButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(transform, false);
+
+        RectTransform btnRect = btnObj.GetComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0f, 0f);
+        btnRect.anchorMax = new Vector2(0f, 0f);
+        btnRect.pivot = new Vector2(0f, 0f);
+        btnRect.anchoredPosition = new Vector2(24f, 200f);
+        btnRect.sizeDelta = new Vector2(128f, 64f);
+
+        _worldInfoDetailButtonImage = btnObj.GetComponent<Image>();
+        _worldInfoDetailButtonImage.color = new Color(0.28f, 0.32f, 0.38f, 0.9f);
+
+        GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        _worldInfoDetailButtonText = textObj.GetComponent<TextMeshProUGUI>();
+        _worldInfoDetailButtonText.text = "상세정보";
+        _worldInfoDetailButtonText.fontSize = 18f;
+        _worldInfoDetailButtonText.alignment = TextAlignmentOptions.Center;
+        _worldInfoDetailButtonText.color = new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        _worldInfoDetailButtonText.raycastTarget = false;
+        if (quickTitleText != null)
+        {
+            _worldInfoDetailButtonText.font = quickTitleText.font;
+            _worldInfoDetailButtonText.fontSharedMaterial = quickTitleText.fontSharedMaterial;
+        }
+
+        worldInfoDetailButton = btnObj.GetComponent<Button>();
+        worldInfoDetailButton.onClick.AddListener(() =>
+        {
+            if (_worldInfoButtonData != null)
+            {
+                OpenDetailView(_worldInfoButtonData);
+            }
+        });
+
+        SetWorldInfoDetailButtonState(null, false);
+    }
+
     void EnsureNavigationManager()
     {
         if (FindObjectOfType<NavigationManager>() != null) return;
@@ -2276,21 +2419,21 @@ public class ARUIManager : MonoBehaviour
 
     public void EnterNavigationMode()
     {
-        _isNavigationMode = true;
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
         HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
         SetPrimaryButtonsVisible(false);
         ClearScreenMarkers();
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
+        if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
     }
 
     public void ExitNavigationMode()
     {
-        _isNavigationMode = false;
         HideNavigationHUD();
         HideSearchPanel();
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(true);
+        if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(true);
         SetScanningMode();
     }
     #endregion
