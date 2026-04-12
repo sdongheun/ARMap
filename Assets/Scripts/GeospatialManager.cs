@@ -169,7 +169,7 @@ public class GeospatialManager : MonoBehaviour
     public float detectionRadius = 100.0f; // 감지 반경 (미터 단위)
     public float detectionAngle = 130.0f;   // 감지 각도 (도 단위)
     public float verticalAngleLimit = 60.0f;// 수직 각도 제한 (도 단위)
-    public float refreshDistance = 100.0f; // 위치 변경에 따른 데이터 새로고침 기준 (미터 단위)
+    public float refreshDistance = 40.0f; // 위치 변경에 따른 데이터 새로고침 기준 (미터 단위)
     [Range(0.01f, 0.35f)] public float centerViewportThreshold = 0.42f; // 정보 카드 허용 중심 범위
     [Range(0.01f, 0.25f)] public float forwardGroupViewportThreshold = 0.14f; // 같은 전방 시야선상 판정 범위
     public float groupedCandidateDistanceBias = 6.0f; // 같은 그룹에서 후면 후보를 제거하는 최소 거리차

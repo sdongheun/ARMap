@@ -843,7 +843,7 @@ MonoBehaviour:
   detectionRadius: 100
   detectionAngle: 130
   verticalAngleLimit: 45
-  refreshDistance: 80
+  refreshDistance: 40
   centerViewportThreshold: 0.35
   forwardGroupViewportThreshold: 0.14
   groupedCandidateDistanceBias: 6
