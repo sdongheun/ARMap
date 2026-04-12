@@ -341,6 +341,11 @@ public class BuildingMarker : MonoBehaviour
         return _boundBuilding;
     }
 
+    public float GetVisualHeightOffset()
+    {
+        return labelHeight;
+    }
+
     public void SetInfoVisible(bool visible)
     {
         if (!_isInitialized)

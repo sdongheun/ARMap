@@ -806,17 +806,24 @@ MonoBehaviour:
   anchorPreviewRadius: 250
   maxPreviewAnchors: 10
   anchorCreationRadius: 150
-  maxWorldTextMarkers: 5
+  maxWorldTextMarkers: 20
   anchorCreateYieldInterval: 1
   textCreateYieldInterval: 1
-  selectedAnchorCreateDelay: 0.1
+  selectedAnchorCreateDelay: 0.05
   enableWorldTextMarker: 1
   markerRenderMode: 1
-  markerAltitudeOffsetMeters: 2
+  markerAltitudeOffsetMeters: 1
   worldMarkerLocalOffsetMeters: 0
+  worldMarkerShellDistanceScale: 0.45
+  worldMarkerShellMinRadius: 1.5
+  worldMarkerShellMaxRadius: 8
+  worldMarkerShellNearLimitFactor: 0.35
+  worldMarkerHeightDistanceScale: 0.08
+  worldMarkerMinHeightAboveCamera: 0.25
+  worldMarkerMaxHeightAboveCamera: 1.2
   elevationBatchSize: 20
   showAnchorResolveDebugOverlay: 1
-  maxAnchorDebugLines: 10
+  maxAnchorDebugLines: 30
   anchorTrackingWaitSeconds: 20
   markerHeightOffset: 12
   markerHeightOffsetNear: 2.5
@@ -834,12 +841,12 @@ MonoBehaviour:
   infoMarkerMinDistance: 8
   infoMarkerMaxDistance: 30
   detectionRadius: 100
-  detectionAngle: 90
+  detectionAngle: 130
   verticalAngleLimit: 45
   refreshDistance: 80
-  centerViewportThreshold: 0.32
-  forwardGroupViewportThreshold: 0.08
-  groupedCandidateDistanceBias: 3
+  centerViewportThreshold: 0.35
+  forwardGroupViewportThreshold: 0.14
+  groupedCandidateDistanceBias: 6
   isNavigationActive: 0
 --- !u!114 &176907914
 MonoBehaviour:
