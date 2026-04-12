@@ -5,12 +5,20 @@ using Google.XR.ARCoreExtensions;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using UnityEngine.Networking;
+using UnityEngine.EventSystems;
 using System.Linq;
 using System;
 using System.IO;
 
 public class GeospatialManager : MonoBehaviour
 {
+    public enum MarkerRenderMode
+    {
+        Screen2D,
+        World3D,
+        Both
+    }
+
     private enum ClusterGroupingType
     {
         Default,
@@ -29,8 +37,6 @@ public class GeospatialManager : MonoBehaviour
     private class VisibleBuildingCandidate
     {
         public BuildingData building;
-        public string buildingKey;
-        public ARGeospatialAnchor anchor;
         public Vector3 viewportPoint;
         public float distance;
     }
@@ -58,12 +64,24 @@ public class GeospatialManager : MonoBehaviour
 
     private static readonly string[] InstitutionalBuildingSuffixes =
     {
-        "본관", "별관", "기념도서관", "도서관", "학생회관", "기념관", "회관", "학관", "연구동", "행정동", "센터", "연구소", "연구원", "관", "동"
+        "본관", "별관", "기념도서관", "도서관", "학생회관", "기념관", "회관", "학관", "연구동", "행정동", "박물관", "미술관", "체육관", "강당", "센터", "연구소", "연구원", "관", "동"
     };
 
     private static readonly string[] InstitutionalPrefixTokens =
     {
-        "대학교", "대학", "병원", "캠퍼스", "학교", "김해캠퍼스", "부산캠퍼스", "인제대학교", "인제대"
+        "대학교", "대학", "병원", "캠퍼스", "학교"
+    };
+
+    private static readonly string[] InstitutionalFacilityKeywords =
+    {
+        "행정실", "연구실", "사무실", "교학과", "학과", "학부", "대학원", "교육원", "지원센터", "상담센터",
+        "랩", "lab", "카페", "편의점", "매점", "식당", "음식점", "서점", "은행", "atm", "우체국", "복사", "인쇄"
+    };
+
+    private static readonly string[] NonBuildingRepresentativeKeywords =
+    {
+        "삼거리", "사거리", "오거리", "교차로", "정문", "후문", "출구", "입구", "횡단보도", "정류장",
+        "버스정류장", "지하철역", "주차장", "도로", "로터리", "광장", "거리"
     };
 
     // --- Inspector Settings ---
@@ -78,6 +96,7 @@ public class GeospatialManager : MonoBehaviour
     public string kakaoRestApiKey; // 카카오 REST API 호출 키
     public int searchRadius = 200; // 검색 반경 (미터 단위)
     public float clusterRadius = 20.0f; // 클러스터링 반경 (미터 단위)
+    public float institutionalFacilityAssignmentRadius = 45.0f; // 대표 건물 POI 기준 시설 배정 반경
     public List<string> categoryCodes = new List<string> { "MT1", "CS2", "CE7", "HP8", "PM9", "FD6", "SC4" };
     public bool useCommercialCategorySearch = true;
     public bool useCampusCategorySearch = true;
@@ -100,20 +119,45 @@ public class GeospatialManager : MonoBehaviour
     [Header("Marker Settings")]
     public GameObject buildingMarkerPrefab;  // 건물 마커 프리팹
     public bool showNearbyAnchors = true;    // 근처 앵커 항상 표시
-    public float anchorPreviewRadius = 180.0f; // 점으로 보여줄 앵커 반경
+    public bool debugForceShowAllWorldMarkers = false; // 시야 판정과 무관하게 생성된 3D 마커 강제 표시
+    public bool debugPlaceWorldMarkersInFrontOfCamera = false; // 생성된 3D 마커를 카메라 앞에 강제 배치
+    public float debugFrontMarkerDistance = 2.5f; // 카메라 앞 디버그 거리
+    public float debugFrontMarkerHeightOffset = -0.2f; // 카메라 기준 높이 오프셋
+    public float debugFrontMarkerHorizontalSpacing = 0.7f; // 여러 마커 간 가로 간격
+    public float anchorPreviewRadius = 250.0f; // 점으로 보여줄 앵커 반경
     public int maxPreviewAnchors = 10;       // 동시에 보여줄 최대 앵커 수
+    public float anchorCreationRadius = 150.0f; // 현재 위치 기준 실제 생성 반경
+    public int maxWorldTextMarkers = 20; // 후보로 유지할 최대 건물 수
+    public int anchorCreateYieldInterval = 1; // 앵커 몇 개마다 한 프레임 양보할지
+    public int textCreateYieldInterval = 1; // 텍스트 몇 개마다 한 프레임 양보할지
+    public float selectedAnchorCreateDelay = 0.05f; // 같은 건물을 잠시 바라봤을 때만 앵커 생성
+    public bool enableWorldTextMarker = true; // 원인 분리용: 텍스트 마커 생성/표시 토글
+    public MarkerRenderMode markerRenderMode = MarkerRenderMode.World3D; // 2D/3D 마커 렌더 방식
+    public double markerAltitudeOffsetMeters = 1.0; // 지면 고도 기준 앵커 오프셋
+    public float worldMarkerLocalOffsetMeters = 0.0f; // 앵커 기준 3D 마커 추가 높이
+    public float worldMarkerShellDistanceScale = 0.45f; // 카메라와 건물 거리 대비 텍스트 전진 비율
+    public float worldMarkerShellMinRadius = 1.5f; // 텍스트가 건물 중심에서 최소 떨어지는 거리
+    public float worldMarkerShellMaxRadius = 8.0f; // 텍스트가 건물 중심에서 최대 떨어지는 거리
+    public float worldMarkerShellNearLimitFactor = 0.35f; // 아주 가까울 때 카메라-건물 거리 대비 상한 비율
+    public float worldMarkerHeightDistanceScale = 0.08f; // 카메라-건물 거리 대비 텍스트 시각 높이 비율
+    public float worldMarkerMinHeightAboveCamera = 0.25f; // 카메라 기준 최소 텍스트 높이
+    public float worldMarkerMaxHeightAboveCamera = 1.2f; // 카메라 기준 최대 텍스트 높이
+    public int elevationBatchSize = 20; // 고도 조회 좌표 배치 크기
+    public bool showAnchorResolveDebugOverlay = true; // 앵커 해결 상태를 화면에 표시
+    public int maxAnchorDebugLines = 10; // 화면에 유지할 디버그 줄 수
+    public float anchorTrackingWaitSeconds = 20.0f; // 앵커 생성 전 Tracking 대기 시간
     public float markerHeightOffset = 12.0f; // 레거시 고정 오프셋 값(현재는 동적 오프셋 사용)
     public float markerHeightOffsetNear = 2.5f; // 가까울 때 마커 높이
     public float markerHeightOffsetFar = 7.0f; // 멀 때 마커 높이
     public float markerHeightNearDistance = 15.0f; // 최소 높이 기준 거리
     public float markerHeightFarDistance = 120.0f; // 최대 높이 기준 거리
-    public bool showScreenSpaceMarkers = true; // 화면 위 2D 마커 표시
+    public bool showScreenSpaceMarkers = false; // 화면 위 2D 마커 표시
     public float screenMarkerHeightOffsetNear = 5.0f; // 가까울 때 2D 마커 기준 높이
     public float screenMarkerHeightOffsetFar = 12.0f; // 멀 때 2D 마커 기준 높이
     public float screenMarkerHeightNearDistance = 15.0f; // 2D 마커 최소 높이 기준 거리
     public float screenMarkerHeightFarDistance = 120.0f; // 2D 마커 최대 높이 기준 거리
     public float screenMarkerCameraHeightOffset = 0.0f; // 카메라 높이 기준 추가 보정값
-    public bool showWorldSpaceInfoMarker = true; // 중앙 건물의 월드 공간 라벨 표시
+    public bool showWorldSpaceInfoMarker = false; // 중앙 건물의 월드 공간 라벨 표시
     [Range(0.1f, 0.95f)] public float infoMarkerLerp = 0.6f; // 카메라-건물 사이 배치 비율
     public float infoMarkerMinDistance = 8.0f; // 카메라와 너무 붙지 않도록 최소 거리
     public float infoMarkerMaxDistance = 30.0f; // 너무 멀리 가지 않도록 최대 거리
@@ -123,29 +167,48 @@ public class GeospatialManager : MonoBehaviour
     private List<BuildingData> _autoGeneratedBuildingList = new List<BuildingData>();
     // 건물 인식 및 정보 표시 설정
     public float detectionRadius = 100.0f; // 감지 반경 (미터 단위)
-    public float detectionAngle = 60.0f;   // 감지 각도 (도 단위)
+    public float detectionAngle = 130.0f;   // 감지 각도 (도 단위)
     public float verticalAngleLimit = 60.0f;// 수직 각도 제한 (도 단위)
-    public float refreshDistance = 100.0f; // 위치 변경에 따른 데이터 새로고침 기준 (미터 단위)
-    [Range(0.01f, 0.35f)] public float centerViewportThreshold = 0.24f; // 정보 카드 허용 중심 범위
-    [Range(0.01f, 0.25f)] public float forwardGroupViewportThreshold = 0.08f; // 같은 전방 시야선상 판정 범위
-    public float groupedCandidateDistanceBias = 3.0f; // 같은 그룹에서 후면 후보를 제거하는 최소 거리차
+    public float refreshDistance = 40.0f; // 위치 변경에 따른 데이터 새로고침 기준 (미터 단위)
+    [Range(0.01f, 0.35f)] public float centerViewportThreshold = 0.42f; // 정보 카드 허용 중심 범위
+    [Range(0.01f, 0.25f)] public float forwardGroupViewportThreshold = 0.14f; // 같은 전방 시야선상 판정 범위
+    public float groupedCandidateDistanceBias = 6.0f; // 같은 그룹에서 후면 후보를 제거하는 최소 거리차
 
     // --- Internal Variables ---
     private Transform _cameraTransform; // 카메라 트랜스폼 참조
     private BuildingData _currentDetectedBuilding; // 현재 감지된 건물 정보
     private BuildingData _selectedBuilding;// 사용자가 선택한 건물 정보  
     private Dictionary<string, ARGeospatialAnchor> _buildingAnchors = new Dictionary<string, ARGeospatialAnchor>();
+    private List<BuildingData> _anchorCandidateBuildings = new List<BuildingData>();
+    private string _activeAnchorBuildingKey = string.Empty;
+    private Coroutine _activeAnchorCreationCoroutine;
+    private BuildingData _pendingAnchorBuilding;
+    private string _pendingAnchorBuildingKey = string.Empty;
+    private float _pendingAnchorDetectedAt = -1f;
     // 위치 기반 데이터 관리(건물 이름을 키로 앵커 참조 저장)
     private LocationInfo _lastLoadedLocation;
     private bool _isDataLoaded = false;
     private bool _isViewingInfo = false;
     private bool _isReloadingData = false;
+    private bool _isAnchorSetupInProgress = false;
     public bool isNavigationActive = false;
+    private readonly List<string> _anchorDebugLines = new List<string>();
+
+    void Awake()
+    {
+        ApplyMarkerModeConfiguration();
+    }
+
+    void OnValidate()
+    {
+        ApplyMarkerModeConfiguration();
+    }
 
     IEnumerator Start()
     {
-        TryLoadKakaoApiKeyFromLocalFile();
+        TryLoadApiKeysFromLocalFile();
         _cameraTransform = Camera.main.transform; // 메인 카메라 트랜스폼 참조
+        ApplyMarkerModeConfiguration();
 
         if (arUIManager != null)
         {
@@ -196,7 +259,28 @@ public class GeospatialManager : MonoBehaviour
         }
     }
 
-    void TryLoadKakaoApiKeyFromLocalFile()
+    void ApplyMarkerModeConfiguration()
+    {
+        switch (markerRenderMode)
+        {
+            case MarkerRenderMode.World3D:
+                showNearbyAnchors = true;
+                showScreenSpaceMarkers = false;
+                showWorldSpaceInfoMarker = false;
+                break;
+            case MarkerRenderMode.Screen2D:
+                showNearbyAnchors = false;
+                showScreenSpaceMarkers = true;
+                showWorldSpaceInfoMarker = false;
+                break;
+            case MarkerRenderMode.Both:
+                showNearbyAnchors = true;
+                showScreenSpaceMarkers = true;
+                break;
+        }
+    }
+
+    void TryLoadApiKeysFromLocalFile()
     {
         if (!string.IsNullOrWhiteSpace(kakaoRestApiKey)) return;
 
@@ -228,7 +312,79 @@ public class GeospatialManager : MonoBehaviour
         if (EarthManager.EarthTrackingState != TrackingState.Tracking) return;
         if (_isViewingInfo) return;
         if (isNavigationActive) return;
+        if (_isReloadingData) return;
+        if (_isAnchorSetupInProgress) return;
+        HandleWorldMarkerTap();
         CheckBuildingDetection(); // 건물 감지 로직 실행
+    }
+
+    void HandleWorldMarkerTap()
+    {
+        if (!enableWorldTextMarker || !ShouldRenderWorldMarkers())
+        {
+            return;
+        }
+
+        if (!TryGetPointerDownPosition(out Vector2 screenPosition, out int fingerId, out bool isTouch))
+        {
+            return;
+        }
+
+        Camera currentCamera = Camera.main;
+        if (currentCamera == null)
+        {
+            return;
+        }
+
+        Ray ray = currentCamera.ScreenPointToRay(screenPosition);
+        if (!Physics.Raycast(ray, out RaycastHit hitInfo, 500f))
+        {
+            return;
+        }
+
+        BuildingMarker marker = hitInfo.collider != null
+            ? hitInfo.collider.GetComponentInParent<BuildingMarker>()
+            : null;
+        BuildingData tappedBuilding = marker != null ? marker.GetBoundBuilding() : null;
+        if (tappedBuilding == null)
+        {
+            return;
+        }
+
+        _selectedBuilding = tappedBuilding;
+        _currentDetectedBuilding = tappedBuilding;
+        arUIManager?.OpenDetailView(tappedBuilding);
+    }
+
+    bool TryGetPointerDownPosition(out Vector2 screenPosition, out int fingerId, out bool isTouch)
+    {
+        screenPosition = default;
+        fingerId = -1;
+        isTouch = false;
+
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            if (touch.phase != TouchPhase.Began)
+            {
+                return false;
+            }
+
+            screenPosition = touch.position;
+            fingerId = touch.fingerId;
+            isTouch = true;
+            return true;
+        }
+
+#if UNITY_EDITOR
+        if (Input.GetMouseButtonDown(0))
+        {
+            screenPosition = Input.mousePosition;
+            return true;
+        }
+#endif
+
+        return false;
     }
 
     // --- Building Detection Logic ---
@@ -251,6 +407,7 @@ public class GeospatialManager : MonoBehaviour
                 UpdateMarkerScale(bestTarget);
             }
 
+            RequestAnchorForBuilding(bestTarget);
             arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
         }
         else
@@ -265,6 +422,11 @@ public class GeospatialManager : MonoBehaviour
             {
                 _selectedBuilding = null;
             }
+
+            _pendingAnchorBuilding = null;
+            _pendingAnchorBuildingKey = string.Empty;
+            _pendingAnchorDetectedAt = -1f;
+            arUIManager?.SetWorldInfoDetailButtonState(null, false);
 
             if (visibleCandidates.Count > 0)
             {
@@ -281,14 +443,19 @@ public class GeospatialManager : MonoBehaviour
     {
         if (_currentActiveMarker != null)
         {
-            _currentActiveMarker.SetState(showNearbyAnchors
-                ? BuildingMarker.MarkerVisualState.Preview
-                : BuildingMarker.MarkerVisualState.Hidden);
+            _currentActiveMarker.SetState(BuildingMarker.MarkerVisualState.Preview);
             _currentActiveMarker = null;
         }
 
-        if (!showNearbyAnchors)
+        if (!ShouldRenderWorldMarkers())
         {
+            arUIManager?.SetWorldInfoDetailButtonState(null, false);
+            return;
+        }
+
+        if (!enableWorldTextMarker)
+        {
+            arUIManager?.SetWorldInfoDetailButtonState(null, false);
             return;
         }
 
@@ -297,14 +464,20 @@ public class GeospatialManager : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(buildingKey) && _buildingAnchors.ContainsKey(buildingKey))
         {
             ARGeospatialAnchor anchor = _buildingAnchors[buildingKey];
-            BuildingMarker marker = anchor.GetComponentInChildren<BuildingMarker>();
+            BuildingMarker marker = anchor != null ? anchor.GetComponentInChildren<BuildingMarker>() : null;
 
-            if (marker != null)
+            if (marker != null && anchor != null)
             {
+                ApplyMarkerPlacement(marker, 0, 1);
+                marker.SetInfoVisible(true);
                 marker.SetState(BuildingMarker.MarkerVisualState.Selected);
                 _currentActiveMarker = marker;
+                arUIManager?.SetWorldInfoDetailButtonState(targetBuilding, true);
+                return;
             }
         }
+
+        arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
 
     void UpdatePreviewMarkers(List<VisibleBuildingCandidate> visibleCandidates, BuildingData selectedBuilding)
@@ -312,53 +485,52 @@ public class GeospatialManager : MonoBehaviour
         foreach (var building in _autoGeneratedBuildingList)
         {
             string buildingKey = GetBuildingAnchorKey(building);
-            if (!_buildingAnchors.ContainsKey(buildingKey)) continue;
-
-            ARGeospatialAnchor anchor = _buildingAnchors[buildingKey];
-            if (anchor == null) continue;
+            if (!_buildingAnchors.TryGetValue(buildingKey, out ARGeospatialAnchor anchor) || anchor == null)
+            {
+                continue;
+            }
 
             BuildingMarker marker = anchor.GetComponentInChildren<BuildingMarker>();
-            if (marker != null)
+            if (marker == null)
             {
-                marker.transform.localPosition = Vector3.up * GetDynamicMarkerHeightOffset(anchor.transform.position);
-                marker.SetState(BuildingMarker.MarkerVisualState.Hidden);
-                marker.SetInfoVisible(false);
+                continue;
             }
+
+            ApplyMarkerPlacement(marker, 0, 1);
+            marker.SetInfoVisible(enableWorldTextMarker);
+            marker.SetState(enableWorldTextMarker
+                ? BuildingMarker.MarkerVisualState.Preview
+                : BuildingMarker.MarkerVisualState.Hidden);
         }
 
-        List<VisibleBuildingCandidate> previewBuildings = visibleCandidates
-            .OrderBy(candidate => candidate.distance)
-            .Take(Mathf.Max(1, maxPreviewAnchors))
-            .ToList();
+        _currentActiveMarker = null;
+        arUIManager?.SetWorldInfoDetailButtonState(null, false);
 
-        if (showNearbyAnchors)
+        if (ShouldRenderWorldMarkers() && debugForceShowAllWorldMarkers)
         {
-            foreach (VisibleBuildingCandidate candidate in previewBuildings)
+            if (selectedBuilding != null)
             {
-                ARGeospatialAnchor anchor = candidate.anchor;
-                BuildingMarker marker = anchor.GetComponentInChildren<BuildingMarker>();
-                if (marker != null)
-                {
-                    marker.transform.localPosition = Vector3.up * GetDynamicMarkerHeightOffset(anchor.transform.position);
-                    marker.SetState(BuildingMarker.MarkerVisualState.Preview);
-                }
+                UpdateMarkerScale(selectedBuilding);
             }
+
+            return;
         }
 
-        if (selectedBuilding != null && showNearbyAnchors)
+        if (selectedBuilding != null && ShouldRenderWorldMarkers())
         {
             UpdateMarkerScale(selectedBuilding);
         }
 
-        UpdateWorldSpaceInfoMarker(selectedBuilding);
-        UpdateScreenSpaceMarkers(previewBuildings, selectedBuilding);
     }
 
     void ResetAllMarkers()
     {
         foreach (var anchor in _buildingAnchors.Values)
         {
-            if (anchor == null) continue;
+            if (anchor == null)
+            {
+                continue;
+            }
 
             BuildingMarker marker = anchor.GetComponentInChildren<BuildingMarker>();
             if (marker != null)
@@ -369,92 +541,27 @@ public class GeospatialManager : MonoBehaviour
         }
 
         _currentActiveMarker = null;
-        arUIManager?.ClearScreenMarkers();
-    }
-
-    void UpdateScreenSpaceMarkers(List<VisibleBuildingCandidate> nearbyBuildings, BuildingData selectedBuilding)
-    {
-        if (!showScreenSpaceMarkers || arUIManager == null || _cameraTransform == null)
-        {
-            arUIManager?.ClearScreenMarkers();
-            return;
-        }
-
-        List<ARUIManager.ScreenMarkerData> screenMarkers = new List<ARUIManager.ScreenMarkerData>();
-
-        foreach (VisibleBuildingCandidate candidate in nearbyBuildings)
-        {
-            BuildingData building = candidate.building;
-            ARGeospatialAnchor anchor = candidate.anchor;
-            if (anchor == null) continue;
-
-            Vector3 worldPosition = GetScreenMarkerWorldPosition(anchor);
-            Vector3 screenPoint = Camera.main.WorldToScreenPoint(worldPosition);
-            if (screenPoint.z <= 0f) continue;
-
-            screenMarkers.Add(new ARUIManager.ScreenMarkerData
-            {
-                id = candidate.buildingKey,
-                label = GetScreenMarkerLabel(building),
-                category = string.IsNullOrWhiteSpace(building.description) ? "건물 정보" : building.description,
-                address = $"약 {Mathf.RoundToInt(candidate.distance)}m",
-                screenPosition = new Vector2(screenPoint.x, screenPoint.y),
-                isSelected = selectedBuilding != null && IsSameBuilding(selectedBuilding, building)
-            });
-        }
-
-        arUIManager.UpdateScreenMarkers(screenMarkers);
-    }
-
-    string GetScreenMarkerLabel(BuildingData building)
-    {
-        if (!string.IsNullOrWhiteSpace(building.buildingName))
-        {
-            return building.buildingName;
-        }
-
-        if (building.facilities != null && building.facilities.Count > 0)
-        {
-            FacilityInfo firstFacility = building.facilities[0];
-            if (!string.IsNullOrWhiteSpace(firstFacility?.name))
-            {
-                return firstFacility.name;
-            }
-
-            if (!string.IsNullOrWhiteSpace(firstFacility?.category))
-            {
-                return firstFacility.category;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(building.description))
-        {
-            return building.description;
-        }
-
-        return "장소";
-    }
-
-    string GetMarkerSubtitle(BuildingData building, float distance)
-    {
-        string category = string.IsNullOrWhiteSpace(building.description) ? "장소 정보" : building.description;
-        return $"{category} · 약 {Mathf.RoundToInt(distance)}m";
+        arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
 
     float GetDistanceToBuilding(BuildingData building)
     {
-        if (building == null || _cameraTransform == null)
+        if (building == null)
         {
             return -1f;
         }
 
-        string buildingKey = GetBuildingAnchorKey(building);
-        if (!_buildingAnchors.TryGetValue(buildingKey, out ARGeospatialAnchor anchor) || anchor == null)
+        if (Input.location.status != LocationServiceStatus.Running)
         {
             return -1f;
         }
 
-        return Vector3.Distance(_cameraTransform.position, anchor.transform.position);
+        LocationInfo currentLoc = Input.location.lastData;
+        return (float)HaversineDistance(
+            currentLoc.latitude,
+            currentLoc.longitude,
+            building.latitude,
+            building.longitude);
     }
 
     string GetBuildingAnchorKey(BuildingData building)
@@ -472,63 +579,95 @@ public class GeospatialManager : MonoBehaviour
         return GetBuildingAnchorKey(left) == GetBuildingAnchorKey(right);
     }
 
-    Vector3 GetMarkerWorldPosition(ARGeospatialAnchor anchor)
+    Vector3 GetDebugMarkerWorldPosition(int index, int totalCount)
     {
-        if (anchor == null)
+        if (_cameraTransform == null)
         {
             return Vector3.zero;
         }
 
-        float dynamicOffset = GetDynamicMarkerHeightOffset(anchor.transform.position);
-        return anchor.transform.position + Vector3.up * dynamicOffset;
+        float totalWidth = Mathf.Max(0, totalCount - 1) * debugFrontMarkerHorizontalSpacing;
+        float startOffset = -totalWidth * 0.5f;
+        float xOffset = startOffset + (index * debugFrontMarkerHorizontalSpacing);
+
+        Vector3 forward = _cameraTransform.forward.normalized;
+        Vector3 right = _cameraTransform.right.normalized;
+        Vector3 up = _cameraTransform.up.normalized;
+
+        Vector3 basePosition = _cameraTransform.position + (forward * debugFrontMarkerDistance) + (up * debugFrontMarkerHeightOffset);
+        return basePosition + (right * xOffset);
     }
 
-    Vector3 GetScreenMarkerWorldPosition(ARGeospatialAnchor anchor)
+    void ApplyMarkerPlacement(BuildingMarker marker, int index, int totalCount)
     {
-        if (anchor == null)
+        if (marker == null)
         {
-            return Vector3.zero;
+            return;
         }
 
-        Vector3 screenMarkerWorldPosition = anchor.transform.position;
+        bool shouldUseDebugFrontPlacement = debugForceShowAllWorldMarkers &&
+                                            (debugPlaceWorldMarkersInFrontOfCamera || _buildingAnchors.Count <= 1);
+
+        if (shouldUseDebugFrontPlacement)
+        {
+            marker.transform.position = GetDebugMarkerWorldPosition(index, totalCount);
+            marker.transform.rotation = Quaternion.identity;
+            return;
+        }
+
+        Transform anchorTransform = marker.transform.parent;
+        if (anchorTransform == null)
+        {
+            marker.transform.localPosition = Vector3.up * worldMarkerLocalOffsetMeters;
+            marker.transform.localRotation = Quaternion.identity;
+            return;
+        }
+
+        Vector3 anchorPosition = anchorTransform.position;
+        Vector3 targetPosition = anchorPosition + (Vector3.up * worldMarkerLocalOffsetMeters);
 
         if (_cameraTransform != null)
         {
-            screenMarkerWorldPosition.y = _cameraTransform.position.y + screenMarkerCameraHeightOffset;
-            return screenMarkerWorldPosition;
+            Vector3 horizontalToCamera = _cameraTransform.position - anchorPosition;
+            horizontalToCamera.y = 0f;
+
+            if (horizontalToCamera.sqrMagnitude < 0.0001f)
+            {
+                horizontalToCamera = _cameraTransform.forward;
+                horizontalToCamera.y = 0f;
+            }
+
+            if (horizontalToCamera.sqrMagnitude > 0.0001f)
+            {
+                float distanceToAnchor = Vector3.Distance(_cameraTransform.position, anchorPosition);
+                float shellRadius = Mathf.Clamp(
+                    distanceToAnchor * Mathf.Max(0f, worldMarkerShellDistanceScale),
+                    Mathf.Max(0f, worldMarkerShellMinRadius),
+                    Mathf.Max(worldMarkerShellMinRadius, worldMarkerShellMaxRadius));
+                float nearLimit = distanceToAnchor * Mathf.Max(0f, worldMarkerShellNearLimitFactor);
+                if (nearLimit > 0f)
+                {
+                    shellRadius = Mathf.Min(shellRadius, nearLimit);
+                }
+
+                targetPosition = anchorPosition + (horizontalToCamera.normalized * shellRadius) + (Vector3.up * worldMarkerLocalOffsetMeters);
+
+                float targetHeightAboveCamera = Mathf.Clamp(
+                    distanceToAnchor * Mathf.Max(0f, worldMarkerHeightDistanceScale),
+                    Mathf.Max(0f, worldMarkerMinHeightAboveCamera),
+                    Mathf.Max(worldMarkerMinHeightAboveCamera, worldMarkerMaxHeightAboveCamera));
+                targetPosition.y = _cameraTransform.position.y + targetHeightAboveCamera - marker.GetVisualHeightOffset();
+            }
         }
 
-        float dynamicOffset = GetDynamicScreenMarkerHeightOffset(anchor.transform.position);
-        return screenMarkerWorldPosition + Vector3.up * dynamicOffset;
-    }
-
-    float GetDynamicMarkerHeightOffset(Vector3 anchorWorldPosition)
-    {
-        if (_cameraTransform == null)
-        {
-            return markerHeightOffsetNear;
-        }
-
-        float distance = Vector3.Distance(_cameraTransform.position, anchorWorldPosition);
-        float t = Mathf.InverseLerp(markerHeightNearDistance, markerHeightFarDistance, distance);
-        return Mathf.Lerp(markerHeightOffsetNear, markerHeightOffsetFar, t);
-    }
-
-    float GetDynamicScreenMarkerHeightOffset(Vector3 anchorWorldPosition)
-    {
-        if (_cameraTransform == null)
-        {
-            return screenMarkerHeightOffsetNear;
-        }
-
-        float distance = Vector3.Distance(_cameraTransform.position, anchorWorldPosition);
-        float t = Mathf.InverseLerp(screenMarkerHeightNearDistance, screenMarkerHeightFarDistance, distance);
-        return Mathf.Lerp(screenMarkerHeightOffsetNear, screenMarkerHeightOffsetFar, t);
+        marker.transform.position = targetPosition;
+        marker.transform.localRotation = Quaternion.identity;
     }
 
     // --- API & Data Processing ---
     IEnumerator FetchAndClusterNearbyPlaces(double lat, double lon)
     {
+        ResetAnchorDebugOverlay();
         Dictionary<string, KakaoDocument> mergedPlaces = new Dictionary<string, KakaoDocument>();
         SearchDiagnostics diagnostics = new SearchDiagnostics();
         int successCount = 0;
@@ -612,7 +751,7 @@ public class GeospatialManager : MonoBehaviour
             arUIManager?.ShowToast("주변 장소 정보가 없습니다.");
         }
 
-        CreateAllBuildingAnchors();
+        yield return StartCoroutine(CreateAllBuildingAnchors());
     }
 
     IEnumerator FetchNearbyPlacesFromKakaoCategory(double lat, double lon, string categoryCode, string sourceLabel, int sourcePriority, Action<bool, List<KakaoDocument>> onCompleted)
@@ -761,7 +900,6 @@ public class GeospatialManager : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(document?.road_address_name)) score += 20;
         if (!string.IsNullOrWhiteSpace(document?.phone)) score += 5;
         if (!string.IsNullOrWhiteSpace(document?.category_group_name) && document.category_group_name != "키워드 검색") score += 10;
-        if (!string.IsNullOrWhiteSpace(document?.place_name) && document.place_name.Contains("인제대학교")) score += 15;
         return score;
     }
 
@@ -829,46 +967,410 @@ public class GeospatialManager : MonoBehaviour
     void ClusterAndBuildList(List<KakaoDocument> allPlaces)
     {
         _autoGeneratedBuildingList.Clear();
+        List<List<KakaoDocument>> addressGroups = allPlaces
+            .Where(document => document != null)
+            .GroupBy(document => NormalizeText(GetBestAddress(document)))
+            .Select(group => group.ToList())
+            .ToList();
+
+        foreach (List<KakaoDocument> addressGroup in addressGroups)
+        {
+            if (ShouldUseRepresentativeInstitutionalClustering(addressGroup))
+            {
+                foreach (List<KakaoDocument> cluster in BuildInstitutionalRepresentativeClusters(addressGroup))
+                {
+                    if (cluster.Count > 0)
+                    {
+                        _autoGeneratedBuildingList.Add(ProcessClusterIntoBuildingData(cluster));
+                    }
+                }
+                continue;
+            }
+
+            foreach (List<KakaoDocument> cluster in BuildDistanceAddressClusters(addressGroup))
+            {
+                if (cluster.Count > 0)
+                {
+                    _autoGeneratedBuildingList.Add(ProcessClusterIntoBuildingData(cluster));
+                }
+            }
+        }
+    }
+
+    List<List<KakaoDocument>> BuildDistanceAddressClusters(List<KakaoDocument> documents)
+    {
+        List<List<KakaoDocument>> clusters = new List<List<KakaoDocument>>();
         HashSet<int> processedIndices = new HashSet<int>();
 
-        for (int i = 0; i < allPlaces.Count; i++)
+        for (int i = 0; i < documents.Count; i++)
         {
             if (processedIndices.Contains(i)) continue;
 
             List<KakaoDocument> newCluster = new List<KakaoDocument>();
-            KakaoDocument baseDoc = allPlaces[i];
+            KakaoDocument baseDoc = documents[i];
             newCluster.Add(baseDoc);
             processedIndices.Add(i);
 
-            for (int j = i + 1; j < allPlaces.Count; j++)
+            for (int j = i + 1; j < documents.Count; j++)
             {
                 if (processedIndices.Contains(j)) continue;
 
-                KakaoDocument compareDoc = allPlaces[j];
-
+                KakaoDocument compareDoc = documents[j];
                 double distance = HaversineDistance(double.Parse(baseDoc.y), double.Parse(baseDoc.x),
                     double.Parse(compareDoc.y), double.Parse(compareDoc.x));
 
-                bool isSameAddress = NormalizeText(GetBestAddress(baseDoc)) == NormalizeText(GetBestAddress(compareDoc));
-                string baseBuildingToken = GetInstitutionalBuildingToken(baseDoc);
-                string compareBuildingToken = GetInstitutionalBuildingToken(compareDoc);
-                float effectiveClusterRadius = GetEffectiveClusterRadius(baseDoc, compareDoc);
-
-                if (!string.IsNullOrWhiteSpace(baseBuildingToken) &&
-                    !string.IsNullOrWhiteSpace(compareBuildingToken) &&
-                    NormalizeText(baseBuildingToken) != NormalizeText(compareBuildingToken))
-                {
-                    continue;
-                }
-
-                if (distance <= effectiveClusterRadius && isSameAddress)
+                if (distance <= clusterRadius)
                 {
                     newCluster.Add(compareDoc);
                     processedIndices.Add(j);
                 }
             }
-            _autoGeneratedBuildingList.Add(ProcessClusterIntoBuildingData(newCluster));
+
+            clusters.Add(newCluster);
         }
+
+        return clusters;
+    }
+
+    bool ShouldUseRepresentativeInstitutionalClustering(List<KakaoDocument> addressGroup)
+    {
+        return addressGroup != null &&
+               addressGroup.Count > 0 &&
+               addressGroup.Any(IsRepresentativeBuildingCandidate);
+    }
+
+    List<List<KakaoDocument>> BuildInstitutionalRepresentativeClusters(List<KakaoDocument> addressGroup)
+    {
+        List<List<KakaoDocument>> clusters = new List<List<KakaoDocument>>();
+        Dictionary<string, List<KakaoDocument>> clustersByToken = new Dictionary<string, List<KakaoDocument>>();
+
+        foreach (KakaoDocument representative in SelectRepresentativeBuildingDocuments(addressGroup))
+        {
+            string tokenKey = NormalizeText(GetInstitutionalBuildingToken(representative));
+            if (string.IsNullOrWhiteSpace(tokenKey) || clustersByToken.ContainsKey(tokenKey))
+            {
+                continue;
+            }
+
+            List<KakaoDocument> cluster = new List<KakaoDocument> { representative };
+            clustersByToken[tokenKey] = cluster;
+            clusters.Add(cluster);
+        }
+
+        List<KakaoDocument> leftovers = new List<KakaoDocument>();
+
+        foreach (KakaoDocument document in addressGroup)
+        {
+            if (document == null)
+            {
+                continue;
+            }
+
+            string tokenKey = NormalizeText(GetInstitutionalBuildingToken(document));
+            if (!string.IsNullOrWhiteSpace(tokenKey) &&
+                clustersByToken.TryGetValue(tokenKey, out List<KakaoDocument> exactMatchCluster))
+            {
+                if (!exactMatchCluster.Contains(document))
+                {
+                    exactMatchCluster.Add(document);
+                }
+                continue;
+            }
+
+            if (TryAssignDocumentToNearestRepresentativeCluster(document, clustersByToken, out List<KakaoDocument> nearestCluster))
+            {
+                if (!nearestCluster.Contains(document))
+                {
+                    nearestCluster.Add(document);
+                }
+                continue;
+            }
+
+            leftovers.Add(document);
+        }
+
+        if (leftovers.Count > 0)
+        {
+            foreach (List<KakaoDocument> fallbackCluster in BuildDistanceAddressClusters(leftovers))
+            {
+                if (fallbackCluster.Count > 0)
+                {
+                    clusters.Add(fallbackCluster);
+                }
+            }
+        }
+
+        return clusters;
+    }
+
+    bool TryAssignDocumentToNearestRepresentativeCluster(
+        KakaoDocument document,
+        Dictionary<string, List<KakaoDocument>> clustersByToken,
+        out List<KakaoDocument> matchedCluster)
+    {
+        matchedCluster = null;
+        if (document == null || clustersByToken == null || clustersByToken.Count == 0)
+        {
+            return false;
+        }
+
+        string explicitToken = NormalizeText(GetInstitutionalBuildingToken(document));
+        if (!string.IsNullOrWhiteSpace(explicitToken) && !clustersByToken.ContainsKey(explicitToken))
+        {
+            return false;
+        }
+
+        float bestDistance = float.MaxValue;
+
+        foreach (KeyValuePair<string, List<KakaoDocument>> pair in clustersByToken)
+        {
+            KakaoDocument representative = pair.Value
+                .OrderByDescending(GetRepresentativeBuildingCandidateScore)
+                .ThenByDescending(GetDocumentQualityScore)
+                .FirstOrDefault();
+            if (representative == null)
+            {
+                continue;
+            }
+
+            float distance = (float)HaversineDistance(
+                double.Parse(document.y), double.Parse(document.x),
+                double.Parse(representative.y), double.Parse(representative.x));
+
+            if (distance > institutionalFacilityAssignmentRadius)
+            {
+                continue;
+            }
+
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                matchedCluster = pair.Value;
+            }
+        }
+
+        return matchedCluster != null;
+    }
+
+    List<KakaoDocument> SelectRepresentativeBuildingDocuments(List<KakaoDocument> addressGroup)
+    {
+        Dictionary<KakaoDocument, int> scoreMap = BuildRepresentativeCandidateScoreMap(addressGroup);
+
+        return addressGroup
+            .Where(IsRepresentativeBuildingCandidate)
+            .GroupBy(GetRepresentativeBuildingClusterKey)
+            .Select(group => group
+                .OrderByDescending(document => scoreMap.TryGetValue(document, out int score) ? score : int.MinValue)
+                .ThenByDescending(GetDocumentQualityScore)
+                .ThenByDescending(document => !string.IsNullOrWhiteSpace(document.road_address_name))
+                .ThenByDescending(document => document.place_name?.Length ?? 0)
+                .First())
+            .ToList();
+    }
+
+    bool IsRepresentativeBuildingCandidate(KakaoDocument document)
+    {
+        if (document == null)
+        {
+            return false;
+        }
+
+        if (!LooksLikeAnchorEligibleBuilding(document))
+        {
+            return false;
+        }
+
+        if (GetClusterGroupingType(document) != ClusterGroupingType.Institutional)
+        {
+            return false;
+        }
+
+        return GetRepresentativeBuildingCandidateScore(document) > 0;
+    }
+
+    int GetRepresentativeBuildingCandidateScore(KakaoDocument document)
+    {
+        if (document == null)
+        {
+            return int.MinValue;
+        }
+
+        if (!LooksLikeAnchorEligibleBuilding(document))
+        {
+            return int.MinValue;
+        }
+
+        int score = GetDocumentQualityScore(document);
+        string normalizedPlaceName = NormalizeText(document.place_name);
+        string normalizedToken = NormalizeText(GetInstitutionalBuildingToken(document));
+        string normalizedCategory = NormalizeText(document.category_name);
+        bool hasBuildingToken = !string.IsNullOrWhiteSpace(normalizedToken);
+        bool looksLikeFacility = LooksLikeInstitutionalFacility(document);
+        bool isCommercial = GetClusterGroupingType(document) == ClusterGroupingType.Commercial;
+
+        if (NormalizeText(document.category_group_name) == NormalizeText("키워드 검색"))
+        {
+            score += 45;
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedCategory) &&
+            (normalizedCategory.Contains(NormalizeText("학교부속시설")) ||
+             normalizedCategory.Contains(NormalizeText("대학교")) ||
+             normalizedCategory.Contains(NormalizeText("학교")) ||
+             normalizedCategory.Contains(NormalizeText("병원"))))
+        {
+            score += 18;
+        }
+
+        if (hasBuildingToken)
+        {
+            score += 35;
+        }
+
+        if (normalizedPlaceName == normalizedToken && !string.IsNullOrWhiteSpace(normalizedToken))
+        {
+            score += 10;
+        }
+
+        if (isCommercial)
+        {
+            score -= 60;
+        }
+
+        if (looksLikeFacility)
+        {
+            score -= 55;
+        }
+
+        return score;
+    }
+
+    Dictionary<KakaoDocument, int> BuildRepresentativeCandidateScoreMap(List<KakaoDocument> addressGroup)
+    {
+        Dictionary<KakaoDocument, int> scoreMap = new Dictionary<KakaoDocument, int>();
+        if (addressGroup == null)
+        {
+            return scoreMap;
+        }
+
+        foreach (KakaoDocument document in addressGroup)
+        {
+            scoreMap[document] = GetRepresentativeBuildingCandidateScore(document) +
+                                 GetRepresentativeCentralityScore(document, addressGroup) +
+                                 GetRepresentativeTokenSupportScore(document, addressGroup);
+        }
+
+        return scoreMap;
+    }
+
+    int GetRepresentativeCentralityScore(KakaoDocument document, List<KakaoDocument> addressGroup)
+    {
+        if (document == null || addressGroup == null || addressGroup.Count <= 1)
+        {
+            return 0;
+        }
+
+        int nearbyCount = 0;
+        foreach (KakaoDocument other in addressGroup)
+        {
+            if (other == null || other == document)
+            {
+                continue;
+            }
+
+            double distance = HaversineDistance(
+                double.Parse(document.y), double.Parse(document.x),
+                double.Parse(other.y), double.Parse(other.x));
+
+            if (distance <= institutionalFacilityAssignmentRadius)
+            {
+                nearbyCount++;
+            }
+        }
+
+        return Mathf.Min(nearbyCount * 8, 32);
+    }
+
+    int GetRepresentativeTokenSupportScore(KakaoDocument document, List<KakaoDocument> addressGroup)
+    {
+        if (document == null || addressGroup == null)
+        {
+            return 0;
+        }
+
+        string clusterKey = NormalizeText(GetRepresentativeBuildingClusterKey(document));
+        if (string.IsNullOrWhiteSpace(clusterKey))
+        {
+            return -20;
+        }
+
+        int supportCount = addressGroup.Count(other =>
+            other != null &&
+            NormalizeText(GetRepresentativeBuildingClusterKey(other)) == clusterKey);
+
+        return Mathf.Min(Mathf.Max(0, supportCount - 1) * 10, 40);
+    }
+
+    string GetRepresentativeBuildingClusterKey(KakaoDocument document)
+    {
+        string buildingToken = NormalizeText(GetInstitutionalBuildingToken(document));
+        if (!string.IsNullOrWhiteSpace(buildingToken))
+        {
+            return buildingToken;
+        }
+
+        return NormalizeRepresentativeName(document?.place_name);
+    }
+
+    bool LooksLikeInstitutionalFacility(KakaoDocument document)
+    {
+        string normalizedPlaceName = NormalizeText(document?.place_name);
+        string normalizedCategory = NormalizeText(document?.category_name);
+        string normalizedGroupCategory = NormalizeText(document?.category_group_name);
+
+        return ContainsAnyKeyword(normalizedPlaceName, InstitutionalFacilityKeywords) ||
+               ContainsAnyKeyword(normalizedCategory, InstitutionalFacilityKeywords) ||
+               ContainsAnyKeyword(normalizedGroupCategory, InstitutionalFacilityKeywords) ||
+               ContainsAnyKeyword(normalizedCategory, CommercialKeywords) ||
+               ContainsAnyKeyword(normalizedGroupCategory, CommercialKeywords);
+    }
+
+    bool LooksLikeAnchorEligibleBuilding(KakaoDocument document)
+    {
+        if (document == null)
+        {
+            return false;
+        }
+
+        string normalizedPlaceName = NormalizeText(document.place_name);
+        string normalizedCategory = NormalizeText(document.category_name);
+        string normalizedGroupCategory = NormalizeText(document.category_group_name);
+
+        if (ContainsAnyKeyword(normalizedPlaceName, NonBuildingRepresentativeKeywords) ||
+            ContainsAnyKeyword(normalizedCategory, NonBuildingRepresentativeKeywords) ||
+            ContainsAnyKeyword(normalizedGroupCategory, NonBuildingRepresentativeKeywords))
+        {
+            return false;
+        }
+
+        if (ContainsAnyKeyword(normalizedCategory, CommercialKeywords) ||
+            ContainsAnyKeyword(normalizedGroupCategory, CommercialKeywords))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    string NormalizeRepresentativeName(string placeName)
+    {
+        string normalized = NormalizeText(placeName);
+        foreach (string prefixToken in InstitutionalPrefixTokens)
+        {
+            normalized = normalized.Replace(NormalizeText(prefixToken), string.Empty);
+        }
+
+        return normalized;
     }
 
     // Convert API Data to BuildingData
@@ -879,10 +1381,11 @@ public class GeospatialManager : MonoBehaviour
         string institutionalBuildingToken = SelectInstitutionalBuildingToken(cluster);
         bool useInstitutionalBuildingName = !string.IsNullOrWhiteSpace(institutionalBuildingToken);
         KakaoDocument nameRepresentative = SelectBuildingNameDocument(cluster, detailRepresentative, institutionalBuildingToken);
+        KakaoDocument anchorRepresentative = SelectAnchorRepresentativeDocument(cluster, nameRepresentative);
 
-        newBuilding.buildingName = useInstitutionalBuildingName ? institutionalBuildingToken : nameRepresentative.place_name;
-        newBuilding.latitude = double.Parse(nameRepresentative.y);
-        newBuilding.longitude = double.Parse(nameRepresentative.x);
+        newBuilding.buildingName = ResolveBuildingDisplayName(cluster, nameRepresentative, institutionalBuildingToken, useInstitutionalBuildingName);
+        newBuilding.latitude = double.Parse(anchorRepresentative.y);
+        newBuilding.longitude = double.Parse(anchorRepresentative.x);
         newBuilding.altitude = 0;
         newBuilding.fetchedAddress = !string.IsNullOrWhiteSpace(GetBestAddress(nameRepresentative))
             ? GetBestAddress(nameRepresentative)
@@ -898,17 +1401,60 @@ public class GeospatialManager : MonoBehaviour
         return newBuilding;
     }
 
+    KakaoDocument SelectAnchorRepresentativeDocument(List<KakaoDocument> cluster, KakaoDocument fallbackDocument)
+    {
+        KakaoDocument buildingLikeRepresentative = cluster
+            .Where(LooksLikeAnchorEligibleBuilding)
+            .OrderByDescending(GetRepresentativeBuildingCandidateScore)
+            .ThenByDescending(GetDocumentQualityScore)
+            .ThenByDescending(document => !string.IsNullOrWhiteSpace(document.road_address_name))
+            .ThenByDescending(document => document.place_name?.Length ?? 0)
+            .FirstOrDefault();
+
+        return buildingLikeRepresentative ?? fallbackDocument;
+    }
+
+    string ResolveBuildingDisplayName(List<KakaoDocument> cluster, KakaoDocument nameRepresentative, string buildingToken, bool useInstitutionalBuildingName)
+    {
+        if (!useInstitutionalBuildingName)
+        {
+            return nameRepresentative.place_name;
+        }
+
+        KakaoDocument representativeBuildingDocument = cluster
+            .Where(IsRepresentativeBuildingCandidate)
+            .OrderByDescending(GetRepresentativeBuildingCandidateScore)
+            .ThenByDescending(GetDocumentQualityScore)
+            .FirstOrDefault(document => NormalizeText(GetRepresentativeBuildingClusterKey(document)) == NormalizeText(buildingToken));
+
+        if (!string.IsNullOrWhiteSpace(representativeBuildingDocument?.place_name))
+        {
+            return representativeBuildingDocument.place_name;
+        }
+
+        return !string.IsNullOrWhiteSpace(nameRepresentative?.place_name)
+            ? nameRepresentative.place_name
+            : buildingToken;
+    }
+
     string GetBuildingDescription(List<KakaoDocument> cluster, string buildingName, KakaoDocument nameRepresentative, KakaoDocument detailRepresentative, bool useInstitutionalBuildingName)
     {
         if (useInstitutionalBuildingName)
         {
-            KakaoDocument keywordBuildingDocument = cluster
-                .Where(document => NormalizeText(document?.category_group_name) == NormalizeText("키워드 검색"))
+            KakaoDocument representativeBuildingDocument = cluster
+                .Where(IsRepresentativeBuildingCandidate)
+                .OrderByDescending(GetRepresentativeBuildingCandidateScore)
+                .ThenByDescending(GetDocumentQualityScore)
                 .FirstOrDefault(document => IsBuildingReferenceDocument(document, buildingName, buildingName));
 
-            if (keywordBuildingDocument != null)
+            if (representativeBuildingDocument != null)
             {
-                return "키워드 검색";
+                string buildingDisplayCategory = GetDocumentDisplayCategory(representativeBuildingDocument, "학교시설");
+                if (!string.IsNullOrWhiteSpace(buildingDisplayCategory) &&
+                    buildingDisplayCategory != "키워드 검색")
+                {
+                    return buildingDisplayCategory;
+                }
             }
 
             string institutionalDisplayCategory = GetDocumentDisplayCategory(nameRepresentative, "학교시설");
@@ -1007,9 +1553,9 @@ public class GeospatialManager : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(buildingToken))
         {
             KakaoDocument tokenDocument = cluster
-                .Where(document => NormalizeText(GetInstitutionalBuildingToken(document)) == NormalizeText(buildingToken))
-                .OrderByDescending(document => IsBuildingReferenceDocument(document, buildingToken, buildingToken))
-                .ThenByDescending(document => GetClusterGroupingType(document) == ClusterGroupingType.Institutional)
+                .Where(document => NormalizeText(GetRepresentativeBuildingClusterKey(document)) == NormalizeText(buildingToken))
+                .OrderByDescending(GetRepresentativeBuildingCandidateScore)
+                .ThenByDescending(document => IsBuildingReferenceDocument(document, buildingToken, buildingToken))
                 .ThenByDescending(GetDocumentQualityScore)
                 .ThenByDescending(document => !string.IsNullOrWhiteSpace(document.road_address_name))
                 .FirstOrDefault();
@@ -1021,8 +1567,8 @@ public class GeospatialManager : MonoBehaviour
         }
 
         KakaoDocument buildingNameCandidate = cluster
-            .Where(IsInstitutionalBuildingNameCandidate)
-            .OrderByDescending(GetInstitutionalBuildingNameScore)
+            .Where(IsRepresentativeBuildingCandidate)
+            .OrderByDescending(GetRepresentativeBuildingCandidateScore)
             .ThenByDescending(GetDocumentQualityScore)
             .ThenBy(document => document.place_name?.Length ?? int.MaxValue)
             .FirstOrDefault();
@@ -1033,68 +1579,14 @@ public class GeospatialManager : MonoBehaviour
     string SelectInstitutionalBuildingToken(List<KakaoDocument> cluster)
     {
         return cluster
-            .Select(document => GetInstitutionalBuildingToken(document))
+            .Where(IsRepresentativeBuildingCandidate)
+            .Select(document => GetRepresentativeBuildingClusterKey(document))
             .Where(token => !string.IsNullOrWhiteSpace(token))
             .GroupBy(token => NormalizeText(token))
             .OrderByDescending(group => group.Count())
             .ThenByDescending(group => group.Max(token => token.Length))
             .Select(group => group.First())
             .FirstOrDefault();
-    }
-
-    bool IsInstitutionalBuildingNameCandidate(KakaoDocument document)
-    {
-        if (document == null || GetClusterGroupingType(document) != ClusterGroupingType.Institutional)
-        {
-            return false;
-        }
-
-        return !string.IsNullOrWhiteSpace(GetInstitutionalBuildingToken(document));
-    }
-
-    int GetInstitutionalBuildingNameScore(KakaoDocument document)
-    {
-        string normalizedPlaceName = NormalizeText(GetInstitutionalBuildingToken(document));
-        int score = 0;
-
-        if (normalizedPlaceName.EndsWith(NormalizeText("본관"))) score += 60;
-        if (normalizedPlaceName.EndsWith(NormalizeText("별관"))) score += 55;
-        if (normalizedPlaceName.EndsWith(NormalizeText("기념도서관"))) score += 54;
-        if (normalizedPlaceName.EndsWith(NormalizeText("도서관"))) score += 53;
-        if (normalizedPlaceName.EndsWith(NormalizeText("학생회관"))) score += 52;
-        if (normalizedPlaceName.EndsWith(NormalizeText("기념관"))) score += 51;
-        if (normalizedPlaceName.EndsWith(NormalizeText("관"))) score += 50;
-        if (normalizedPlaceName.EndsWith(NormalizeText("동"))) score += 45;
-        if (!string.IsNullOrWhiteSpace(document?.road_address_name)) score += 10;
-
-        return score;
-    }
-
-    float GetEffectiveClusterRadius(KakaoDocument left, KakaoDocument right)
-    {
-        ClusterGroupingType leftType = GetClusterGroupingType(left);
-        ClusterGroupingType rightType = GetClusterGroupingType(right);
-        string leftToken = NormalizeText(GetInstitutionalBuildingToken(left));
-        string rightToken = NormalizeText(GetInstitutionalBuildingToken(right));
-
-        if (!string.IsNullOrWhiteSpace(leftToken) &&
-            !string.IsNullOrWhiteSpace(rightToken) &&
-            leftToken == rightToken)
-        {
-            return Mathf.Max(clusterRadius, 80.0f);
-        }
-
-        if (leftType == ClusterGroupingType.Commercial || rightType == ClusterGroupingType.Commercial)
-        {
-            return clusterRadius;
-        }
-
-        if (leftType == ClusterGroupingType.Institutional && rightType == ClusterGroupingType.Institutional)
-        {
-            return Mathf.Max(clusterRadius, 80.0f);
-        }
-
-        return clusterRadius;
     }
 
     ClusterGroupingType GetClusterGroupingType(KakaoDocument document)
@@ -1223,45 +1715,270 @@ public class GeospatialManager : MonoBehaviour
         return string.IsNullOrWhiteSpace(reducedName);
     }
 
-    void CreateAllBuildingAnchors()
+    IEnumerator CreateAllBuildingAnchors()
     {
+        _isAnchorSetupInProgress = true;
+        if (_activeAnchorCreationCoroutine != null)
+        {
+            StopCoroutine(_activeAnchorCreationCoroutine);
+            _activeAnchorCreationCoroutine = null;
+        }
+
         foreach (var anchor in _buildingAnchors.Values) if (anchor != null) Destroy(anchor.gameObject);
         _buildingAnchors.Clear();
-        int anchorFailureCount = 0;
+        _activeAnchorBuildingKey = string.Empty;
+        ResetAllMarkers();
+        _pendingAnchorBuilding = null;
+        _pendingAnchorBuildingKey = string.Empty;
+        _pendingAnchorDetectedAt = -1f;
 
-        foreach (var building in _autoGeneratedBuildingList)
+        List<BuildingData> targetBuildings = GetBuildingsForAnchorCreation();
+        _anchorCandidateBuildings = targetBuildings;
+
+        AppendAnchorDebug($"Anchor targets ready: {targetBuildings.Count}/{_autoGeneratedBuildingList.Count}");
+        yield return StartCoroutine(WaitForTrackingBeforeAnchors());
+        ApplyFallbackAltitudes(targetBuildings);
+        AppendAnchorDebug($"Anchor creation deferred until selection");
+        _isAnchorSetupInProgress = false;
+    }
+
+    void RequestAnchorForBuilding(BuildingData building)
+    {
+        if (building == null)
         {
-            string buildingKey = GetBuildingAnchorKey(building);
-            ARGeospatialAnchor anchor = AnchorManager.AddAnchor(building.latitude, building.longitude, building.altitude, Quaternion.identity);
+            return;
+        }
 
-            if (anchor != null)
+        string buildingKey = GetBuildingAnchorKey(building);
+        if (string.IsNullOrWhiteSpace(buildingKey))
+        {
+            return;
+        }
+
+        if (_pendingAnchorBuildingKey != buildingKey)
+        {
+            _pendingAnchorBuilding = building;
+            _pendingAnchorBuildingKey = buildingKey;
+            _pendingAnchorDetectedAt = Time.time;
+            return;
+        }
+
+        if (Time.time - _pendingAnchorDetectedAt < Mathf.Max(0f, selectedAnchorCreateDelay))
+        {
+            return;
+        }
+
+        if (_activeAnchorBuildingKey == buildingKey && _buildingAnchors.ContainsKey(buildingKey))
+        {
+            return;
+        }
+
+        if (_activeAnchorCreationCoroutine != null)
+        {
+            StopCoroutine(_activeAnchorCreationCoroutine);
+        }
+
+        _activeAnchorCreationCoroutine = StartCoroutine(CreateAnchorForBuilding(_pendingAnchorBuilding));
+    }
+
+    IEnumerator CreateAnchorForBuilding(BuildingData building)
+    {
+        _isAnchorSetupInProgress = true;
+        string buildingKey = GetBuildingAnchorKey(building);
+
+        foreach (var existingAnchor in _buildingAnchors.Values)
+        {
+            if (existingAnchor != null)
             {
-                _buildingAnchors[buildingKey] = anchor;
+                Destroy(existingAnchor.gameObject);
+            }
+        }
 
-                if (buildingMarkerPrefab != null)
-                {
-                    GameObject markerObj = Instantiate(buildingMarkerPrefab, anchor.transform);
-                    markerObj.transform.localPosition = Vector3.up * GetDynamicMarkerHeightOffset(anchor.transform.position);
+        _buildingAnchors.Clear();
+        _currentActiveMarker = null;
+        _activeAnchorBuildingKey = string.Empty;
 
-                    BuildingMarker marker = markerObj.GetComponent<BuildingMarker>();
-                    if (marker != null)
-                    {
-                        marker.SetState(BuildingMarker.MarkerVisualState.Hidden, true);
-                    }
-                }
+        AppendAnchorDebug($"Anchor create start: {TrimDebugLabel(building.buildingName)}");
+        yield return null;
+
+        ARGeospatialAnchor anchor = AnchorManager.AddAnchor(
+            building.latitude,
+            building.longitude,
+            building.altitude,
+            Quaternion.identity);
+
+        if (anchor == null)
+        {
+            AppendAnchorDebug($"Anchor create fail: {TrimDebugLabel(building.buildingName)}");
+            _isAnchorSetupInProgress = false;
+            _activeAnchorCreationCoroutine = null;
+            yield break;
+        }
+
+        _buildingAnchors[buildingKey] = anchor;
+        _activeAnchorBuildingKey = buildingKey;
+        AppendAnchorDebug($"Anchor create ok: {TrimDebugLabel(building.buildingName)}");
+
+        if (enableWorldTextMarker && buildingMarkerPrefab != null)
+        {
+            yield return null;
+
+            GameObject markerObj = Instantiate(buildingMarkerPrefab, anchor.transform);
+            markerObj.transform.localPosition = Vector3.up * worldMarkerLocalOffsetMeters;
+            markerObj.transform.localRotation = Quaternion.identity;
+
+            BuildingMarker marker = markerObj.GetComponent<BuildingMarker>();
+            if (marker != null)
+            {
+                ApplyMarkerPlacement(marker, 0, 1);
+                marker.BindBuilding(building);
+                marker.SetInfoContent(
+                    building.buildingName,
+                    string.IsNullOrWhiteSpace(building.description) ? "장소 정보" : building.description);
+                marker.SetInfoVisible(true);
+                marker.SetState(BuildingMarker.MarkerVisualState.Selected, true);
+                _currentActiveMarker = marker;
+                AppendAnchorDebug($"TEXT ready: {TrimDebugLabel(building.buildingName)}");
             }
             else
             {
-                anchorFailureCount++;
-                Debug.LogWarning($"Failed to create geospatial anchor for {building.buildingName} ({buildingKey}).");
+                AppendAnchorDebug($"TEXT component missing: {TrimDebugLabel(building.buildingName)}");
             }
         }
-
-        if (anchorFailureCount > 0)
+        else if (!enableWorldTextMarker)
         {
-            arUIManager?.ShowToast("일부 건물 마커를 표시하지 못했습니다.");
+            AppendAnchorDebug($"TEXT disabled: {TrimDebugLabel(building.buildingName)}");
+        }
+        else
+        {
+            AppendAnchorDebug($"TEXT prefab missing: {TrimDebugLabel(building.buildingName)}");
+        }
+
+        _isAnchorSetupInProgress = false;
+        _activeAnchorCreationCoroutine = null;
+    }
+
+    List<BuildingData> GetBuildingsForAnchorCreation()
+    {
+        if (_autoGeneratedBuildingList == null || _autoGeneratedBuildingList.Count == 0)
+        {
+            return new List<BuildingData>();
+        }
+
+        if (Input.location.status != LocationServiceStatus.Running)
+        {
+            return _autoGeneratedBuildingList
+                .Take(Mathf.Max(1, maxWorldTextMarkers))
+                .ToList();
+        }
+
+        LocationInfo currentLoc = Input.location.lastData;
+
+        return _autoGeneratedBuildingList
+            .Where(building => building != null)
+            .Select(building => new
+            {
+                building,
+                distance = HaversineDistance(
+                    currentLoc.latitude,
+                    currentLoc.longitude,
+                    building.latitude,
+                    building.longitude)
+            })
+            .Where(item => item.distance <= anchorCreationRadius)
+            .OrderBy(item => item.distance)
+            .Take(Mathf.Max(1, maxWorldTextMarkers))
+            .Select(item => item.building)
+            .ToList();
+    }
+
+    IEnumerator WaitForTrackingBeforeAnchors()
+    {
+        if (EarthManager == null)
+        {
+            AppendAnchorDebug("Earth manager missing");
+            yield break;
+        }
+
+        float timeout = Mathf.Max(0f, anchorTrackingWaitSeconds);
+        float elapsed = 0f;
+
+        while (EarthManager.EarthTrackingState != TrackingState.Tracking && elapsed < timeout)
+        {
+            AppendAnchorDebug($"Wait tracking: {EarthManager.EarthTrackingState}");
+            yield return new WaitForSeconds(0.5f);
+            elapsed += 0.5f;
+        }
+
+        if (EarthManager.EarthTrackingState == TrackingState.Tracking)
+        {
+            AppendAnchorDebug($"Tracking ready: alt={EarthManager.CameraGeospatialPose.Altitude:F1}");
+        }
+        else
+        {
+            AppendAnchorDebug($"Tracking timeout: {EarthManager.EarthTrackingState}");
         }
     }
+
+    void ResetAnchorDebugOverlay()
+    {
+        _anchorDebugLines.Clear();
+        arUIManager?.ClearDebugOverlay();
+    }
+
+    void AppendAnchorDebug(string message)
+    {
+        Debug.Log($"[AnchorDebug] {message}");
+
+        if (!showAnchorResolveDebugOverlay)
+        {
+            return;
+        }
+
+        _anchorDebugLines.Add(message);
+        while (_anchorDebugLines.Count > Mathf.Max(1, maxAnchorDebugLines))
+        {
+            _anchorDebugLines.RemoveAt(0);
+        }
+
+        arUIManager?.SetDebugOverlay(string.Join("\n", _anchorDebugLines));
+    }
+
+    void ApplyFallbackAltitudes(List<BuildingData> buildings)
+    {
+        if (buildings == null)
+        {
+            return;
+        }
+
+        double baseAltitude = 0;
+        if (EarthManager != null && EarthManager.EarthTrackingState == TrackingState.Tracking)
+        {
+            baseAltitude = EarthManager.CameraGeospatialPose.Altitude;
+        }
+
+        foreach (BuildingData building in buildings)
+        {
+            if (building == null)
+            {
+                continue;
+            }
+
+            building.altitude = baseAltitude + markerAltitudeOffsetMeters;
+            AppendAnchorDebug($"Anchor alt: {TrimDebugLabel(building.buildingName)} ({building.altitude:F1})");
+        }
+    }
+
+    string TrimDebugLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Unnamed";
+        }
+
+        return value.Length <= 18 ? value : $"{value.Substring(0, 18)}...";
+    }
+
     //건물 인식 방식 결정
     BuildingData FindBestTargetFromExistingAnchors(List<VisibleBuildingCandidate> visibleCandidates) // 카메라 시점과 위치를 기반으로 가장 적합한 건물 감지
     {
@@ -1306,30 +2023,47 @@ public class GeospatialManager : MonoBehaviour
     {
         List<VisibleBuildingCandidate> visibleBuildings = new List<VisibleBuildingCandidate>();
 
-        foreach (var building in _autoGeneratedBuildingList)
+        if (_anchorCandidateBuildings == null || _anchorCandidateBuildings.Count == 0)
         {
-            string buildingKey = GetBuildingAnchorKey(building);
-            if (!_buildingAnchors.ContainsKey(buildingKey))
+            return visibleBuildings;
+        }
+
+        if (EarthManager == null || EarthManager.EarthTrackingState != TrackingState.Tracking)
+        {
+            return visibleBuildings;
+        }
+
+        GeospatialPose pose = EarthManager.CameraGeospatialPose;
+        if (pose.HeadingAccuracy > 35.0)
+        {
+            return visibleBuildings;
+        }
+
+        foreach (BuildingData building in _anchorCandidateBuildings)
+        {
+            if (building == null)
             {
                 continue;
             }
 
-            ARGeospatialAnchor anchor = _buildingAnchors[buildingKey];
-            if (anchor == null)
-            {
-                continue;
-            }
-
-            Vector3 markerWorldPosition = GetScreenMarkerWorldPosition(anchor);
-            float distance;
-            Vector3 viewportPoint;
-
-            if (!TryGetVisibleViewportPoint(markerWorldPosition, out viewportPoint, out distance))
-            {
-                continue;
-            }
+            float distance = (float)HaversineDistance(
+                pose.Latitude,
+                pose.Longitude,
+                building.latitude,
+                building.longitude);
 
             if (distance > anchorPreviewRadius)
+            {
+                continue;
+            }
+
+            float signedHeadingDelta = Mathf.DeltaAngle(
+                (float)pose.Heading,
+                (float)CalculateBearingDegrees(pose.Latitude, pose.Longitude, building.latitude, building.longitude));
+            float normalizedOffset = signedHeadingDelta / Mathf.Max(1f, detectionAngle);
+            float viewportX = 0.5f + Mathf.Clamp(normalizedOffset, -0.5f, 0.5f);
+
+            if (viewportX < 0f || viewportX > 1f)
             {
                 continue;
             }
@@ -1337,14 +2071,25 @@ public class GeospatialManager : MonoBehaviour
             visibleBuildings.Add(new VisibleBuildingCandidate
             {
                 building = building,
-                buildingKey = buildingKey,
-                anchor = anchor,
-                viewportPoint = viewportPoint,
+                viewportPoint = new Vector3(viewportX, 0.5f, distance),
                 distance = distance
             });
         }
 
         return visibleBuildings;
+    }
+
+    double CalculateBearingDegrees(double lat1, double lon1, double lat2, double lon2)
+    {
+        double phi1 = lat1 * Mathf.Deg2Rad;
+        double phi2 = lat2 * Mathf.Deg2Rad;
+        double deltaLon = (lon2 - lon1) * Mathf.Deg2Rad;
+
+        double y = Math.Sin(deltaLon) * Math.Cos(phi2);
+        double x = Math.Cos(phi1) * Math.Sin(phi2) -
+                   Math.Sin(phi1) * Math.Cos(phi2) * Math.Cos(deltaLon);
+        double bearing = Math.Atan2(y, x) * Mathf.Rad2Deg;
+        return (bearing + 360.0) % 360.0;
     }
 
     List<VisibleBuildingCandidate> GetFrontMostCandidates(List<VisibleBuildingCandidate> visibleCandidates)
@@ -1376,70 +2121,11 @@ public class GeospatialManager : MonoBehaviour
         return frontMostCandidates;
     }
 
-    bool TryGetVisibleViewportPoint(Vector3 worldPosition, out Vector3 viewportPoint, out float distance)
+    bool ShouldRenderWorldMarkers()
     {
-        viewportPoint = Camera.main.WorldToViewportPoint(worldPosition);
-        distance = Vector3.Distance(_cameraTransform.position, worldPosition);
-
-        if (viewportPoint.z <= 0f)
-        {
-            return false;
-        }
-
-        if (viewportPoint.x < 0f || viewportPoint.x > 1f || viewportPoint.y < 0f || viewportPoint.y > 1f)
-        {
-            return false;
-        }
-
-        return true;
+        return showNearbyAnchors && (markerRenderMode == MarkerRenderMode.World3D || markerRenderMode == MarkerRenderMode.Both);
     }
 
-    void UpdateWorldSpaceInfoMarker(BuildingData selectedBuilding)
-    {
-        if (!showWorldSpaceInfoMarker || selectedBuilding == null)
-        {
-            return;
-        }
-
-        string buildingKey = GetBuildingAnchorKey(selectedBuilding);
-        if (!_buildingAnchors.ContainsKey(buildingKey))
-        {
-            return;
-        }
-
-        ARGeospatialAnchor anchor = _buildingAnchors[buildingKey];
-        if (anchor == null)
-        {
-            return;
-        }
-
-        BuildingMarker marker = anchor.GetComponentInChildren<BuildingMarker>();
-        if (marker == null)
-        {
-            return;
-        }
-
-        float distance = Vector3.Distance(_cameraTransform.position, anchor.transform.position);
-        marker.SetInfoContent(selectedBuilding.buildingName, GetMarkerSubtitle(selectedBuilding, distance));
-        marker.SetInfoWorldPosition(GetInfoMarkerWorldPosition(anchor));
-        marker.SetInfoVisible(true);
-    }
-
-    Vector3 GetInfoMarkerWorldPosition(ARGeospatialAnchor anchor)
-    {
-        Vector3 cameraPosition = _cameraTransform.position;
-        Vector3 anchorPosition = GetMarkerWorldPosition(anchor);
-        Vector3 toAnchor = anchorPosition - cameraPosition;
-        float anchorDistance = toAnchor.magnitude;
-
-        if (anchorDistance <= Mathf.Epsilon)
-        {
-            return anchorPosition;
-        }
-
-        float targetDistance = Mathf.Clamp(anchorDistance * infoMarkerLerp, infoMarkerMinDistance, infoMarkerMaxDistance);
-        return cameraPosition + toAnchor.normalized * targetDistance;
-    }
     void CheckMovementAndReload() // 위치 변경에 따른 데이터 새로고침 여부 판단
     {
         if (_isReloadingData)
@@ -1487,7 +2173,6 @@ public class GeospatialManager : MonoBehaviour
         _currentDetectedBuilding = null;
         _selectedBuilding = null;
         _currentActiveMarker = null;
-        arUIManager?.ClearScreenMarkers();
         arUIManager?.SetScanningMode();
     }
 }
