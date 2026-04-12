@@ -30,6 +30,7 @@ public class GeospatialManager : MonoBehaviour
     private class LocalApiKeys
     {
         public string kakaoRestApiKey;
+        public string tmapApiKey;
         public string androidCloudServicesApiKey;
         public string iosCloudServicesApiKey;
     }
@@ -94,6 +95,7 @@ public class GeospatialManager : MonoBehaviour
 
     [Header("API & Data")]
     public string kakaoRestApiKey; // 카카오 REST API 호출 키
+    public string tmapApiKey; // TMAP API 키
     public int searchRadius = 200; // 검색 반경 (미터 단위)
     public float clusterRadius = 20.0f; // 클러스터링 반경 (미터 단위)
     public float institutionalFacilityAssignmentRadius = 45.0f; // 대표 건물 POI 기준 시설 배정 반경
@@ -282,7 +284,7 @@ public class GeospatialManager : MonoBehaviour
 
     void TryLoadApiKeysFromLocalFile()
     {
-        if (!string.IsNullOrWhiteSpace(kakaoRestApiKey)) return;
+        if (!string.IsNullOrWhiteSpace(kakaoRestApiKey) && !string.IsNullOrWhiteSpace(tmapApiKey)) return;
 
         string filePath = Path.Combine(Application.streamingAssetsPath, "LocalApiKeys.json");
         if (!File.Exists(filePath))
@@ -298,6 +300,10 @@ public class GeospatialManager : MonoBehaviour
             if (!string.IsNullOrWhiteSpace(keys?.kakaoRestApiKey))
             {
                 kakaoRestApiKey = keys.kakaoRestApiKey;
+            }
+            if (!string.IsNullOrWhiteSpace(keys?.tmapApiKey))
+            {
+                tmapApiKey = keys.tmapApiKey;
             }
         }
         catch (Exception ex)
