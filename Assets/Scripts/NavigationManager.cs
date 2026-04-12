@@ -297,11 +297,12 @@ public class NavigationManager : MonoBehaviour
         double lon = pose.Longitude;
 
         string encodedKeyword = UnityWebRequest.EscapeURL(keyword);
-        string url = $"https://dapi.kakao.com/v2/local/search/keyword.json?query={encodedKeyword}&x={lon}&y={lat}&radius=20000&sort=distance";
+        string url = $"https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword={encodedKeyword}&searchType=all&searchtypCd=R&centerLon={lon:F7}&centerLat={lat:F7}&radius=20&count=20&reqCoordType=WGS84GEO&resCoordType=WGS84GEO";
 
         using (UnityWebRequest request = UnityWebRequest.Get(url))
         {
-            request.SetRequestHeader("Authorization", "KakaoAK " + geospatialManager.kakaoRestApiKey);
+            request.SetRequestHeader("appKey", geospatialManager.tmapApiKey);
+            request.SetRequestHeader("Accept", "application/json");
             yield return request.SendWebRequest();
 
             if (request.result != UnityWebRequest.Result.Success)
@@ -311,26 +312,68 @@ public class NavigationManager : MonoBehaviour
                 yield break;
             }
 
-            KakaoResponse response = JsonUtility.FromJson<KakaoResponse>(request.downloadHandler.text);
-            if (response.documents == null || response.documents.Length == 0)
+            // TMAP POI 응답 파싱 (MiniJSON 사용)
+            var root = MiniJSON.Json.Deserialize(request.downloadHandler.text) as Dictionary<string, object>;
+            if (root == null || !root.ContainsKey("searchPoiInfo"))
+            {
+                arUIManager?.ShowEmptyResults("검색 결과가 없습니다");
+                yield break;
+            }
+
+            var searchPoiInfo = root["searchPoiInfo"] as Dictionary<string, object>;
+            var pois = searchPoiInfo?["pois"] as Dictionary<string, object>;
+            var poiList = pois?["poi"] as List<object>;
+            if (poiList == null || poiList.Count == 0)
             {
                 arUIManager?.ShowEmptyResults("검색 결과가 없습니다");
                 yield break;
             }
 
             List<DestinationResult> results = new List<DestinationResult>();
-            foreach (KakaoDocument doc in response.documents)
+            foreach (var item in poiList)
             {
+                var poi = item as Dictionary<string, object>;
+                if (poi == null) continue;
+
+                string poiName = poi.ContainsKey("name") ? poi["name"]?.ToString() : "";
+                string upper = poi.ContainsKey("upperAddrName") ? poi["upperAddrName"]?.ToString() : "";
+                string middle = poi.ContainsKey("middleAddrName") ? poi["middleAddrName"]?.ToString() : "";
+                string lower = poi.ContainsKey("lowerAddrName") ? poi["lowerAddrName"]?.ToString() : "";
+                string detail = poi.ContainsKey("detailAddrName") ? poi["detailAddrName"]?.ToString() : "";
+                string address = $"{upper} {middle} {lower}".Trim();
+                string roadAddress = string.IsNullOrEmpty(detail) ? address : $"{address} {detail}".Trim();
+
+                // 입구 좌표 우선, 없으면 중심 좌표
+                string latStr = poi.ContainsKey("frontLat") && !string.IsNullOrEmpty(poi["frontLat"]?.ToString())
+                    ? poi["frontLat"].ToString()
+                    : (poi.ContainsKey("noorLat") ? poi["noorLat"]?.ToString() : "0");
+                string lonStr = poi.ContainsKey("frontLon") && !string.IsNullOrEmpty(poi["frontLon"]?.ToString())
+                    ? poi["frontLon"].ToString()
+                    : (poi.ContainsKey("noorLon") ? poi["noorLon"]?.ToString() : "0");
+
+                double poiLat = 0, poiLon = 0;
+                double.TryParse(latStr, out poiLat);
+                double.TryParse(lonStr, out poiLon);
+
+                string category = poi.ContainsKey("upperBizName") ? poi["upperBizName"]?.ToString() : "";
+
+                // radius는 km 단위
                 int distMeters = 0;
-                int.TryParse(doc.distance, out distMeters);
+                if (poi.ContainsKey("radius"))
+                {
+                    double radiusKm = 0;
+                    double.TryParse(poi["radius"]?.ToString(), out radiusKm);
+                    distMeters = (int)(radiusKm * 1000);
+                }
+
                 results.Add(new DestinationResult
                 {
-                    placeName = doc.place_name,
-                    addressName = doc.address_name,
-                    roadAddressName = doc.road_address_name,
-                    latitude = double.Parse(doc.y),
-                    longitude = double.Parse(doc.x),
-                    categoryName = doc.category_group_name,
+                    placeName = poiName,
+                    addressName = address,
+                    roadAddressName = roadAddress,
+                    latitude = poiLat,
+                    longitude = poiLon,
+                    categoryName = category,
                     distance = distMeters
                 });
             }
@@ -442,11 +485,18 @@ public class NavigationManager : MonoBehaviour
 
     IEnumerator FetchRoute(double originLat, double originLon, double destLat, double destLon, string destName, Action<NavigationRoute> callback)
     {
-        string url = $"https://apis-navi.kakaomobility.com/v1/directions?origin={originLon},{originLat}&destination={destLon},{destLat}&priority=RECOMMEND";
+        string url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1";
+        string body = $"{{\"startX\":{originLon:F7},\"startY\":{originLat:F7},\"endX\":{destLon:F7},\"endY\":{destLat:F7},\"startName\":\"출발지\",\"endName\":\"{destName}\",\"reqCoordType\":\"WGS84GEO\",\"resCoordType\":\"WGS84GEO\"}}";
 
-        using (UnityWebRequest request = UnityWebRequest.Get(url))
+        byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(body);
+
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
-            request.SetRequestHeader("Authorization", "KakaoAK " + geospatialManager.kakaoRestApiKey);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("appKey", geospatialManager.tmapApiKey);
+            request.SetRequestHeader("Accept", "application/json");
             yield return request.SendWebRequest();
 
             if (request.result != UnityWebRequest.Result.Success)
@@ -456,24 +506,28 @@ public class NavigationManager : MonoBehaviour
                 yield break;
             }
 
-            KakaoDirectionsResponse dirResponse = JsonUtility.FromJson<KakaoDirectionsResponse>(request.downloadHandler.text);
-            if (dirResponse.routes == null || dirResponse.routes.Length == 0 || dirResponse.routes[0].result_code != 0)
-            {
-                Debug.LogError("카카오 경로 응답에 유효한 경로 없음");
-                callback?.Invoke(null);
-                yield break;
-            }
-
-            NavigationRoute route = ParseRoute(dirResponse.routes[0], destName, destLat, destLon);
+            NavigationRoute route = ParseTmapRoute(request.downloadHandler.text, destName, destLat, destLon);
             callback?.Invoke(route);
         }
     }
 
-    NavigationRoute ParseRoute(KakaoRoute kakaoRoute, string destName, double destLat, double destLon)
+    NavigationRoute ParseTmapRoute(string rawJson, string destName, double destLat, double destLon)
     {
+        var root = MiniJSON.Json.Deserialize(rawJson) as Dictionary<string, object>;
+        if (root == null || !root.ContainsKey("features"))
+        {
+            Debug.LogError("TMAP 경로 응답 파싱 실패: features 없음");
+            return null;
+        }
+
+        var features = root["features"] as List<object>;
+        if (features == null || features.Count == 0)
+        {
+            Debug.LogError("TMAP 경로 응답: features가 비어 있음");
+            return null;
+        }
+
         NavigationRoute route = new NavigationRoute();
-        route.totalDistance = kakaoRoute.summary.distance;
-        route.totalDuration = kakaoRoute.summary.duration;
         route.destination = new DestinationResult
         {
             placeName = destName,
@@ -481,45 +535,90 @@ public class NavigationManager : MonoBehaviour
             longitude = destLon
         };
 
+        // 가이드 좌표 셋 (경로점에 isAnchorPoint 마킹용)
         HashSet<string> guideCoords = new HashSet<string>();
-        foreach (KakaoRouteSection section in kakaoRoute.sections)
+
+        foreach (var featureObj in features)
         {
-            if (section.guides != null)
+            var feature = featureObj as Dictionary<string, object>;
+            if (feature == null) continue;
+
+            var geometry = feature.ContainsKey("geometry") ? feature["geometry"] as Dictionary<string, object> : null;
+            var properties = feature.ContainsKey("properties") ? feature["properties"] as Dictionary<string, object> : null;
+            if (geometry == null || properties == null) continue;
+
+            string geomType = geometry.ContainsKey("type") ? geometry["type"]?.ToString() : "";
+
+            if (geomType == "Point")
             {
-                foreach (KakaoGuide guide in section.guides)
+                // 첫 번째 Point feature에서 총 거리/시간 추출
+                if (route.totalDistance == 0 && properties.ContainsKey("totalDistance"))
                 {
+                    int.TryParse(properties["totalDistance"]?.ToString(), out route.totalDistance);
+                }
+                if (route.totalDuration == 0 && properties.ContainsKey("totalTime"))
+                {
+                    int.TryParse(properties["totalTime"]?.ToString(), out route.totalDuration);
+                }
+
+                // 가이드 생성
+                var coords = geometry.ContainsKey("coordinates") ? geometry["coordinates"] as List<object> : null;
+                if (coords != null && coords.Count >= 2)
+                {
+                    double lon = Convert.ToDouble(coords[0]);
+                    double lat = Convert.ToDouble(coords[1]);
+
+                    int turnType = 0;
+                    if (properties.ContainsKey("turnType"))
+                        int.TryParse(properties["turnType"]?.ToString(), out turnType);
+
+                    string description = properties.ContainsKey("description") ? properties["description"]?.ToString() : "";
+
+                    int guideDist = 0;
+                    if (properties.ContainsKey("distance"))
+                        int.TryParse(properties["distance"]?.ToString(), out guideDist);
+
                     route.guides.Add(new RouteGuide
                     {
-                        type = guide.type,
-                        guidance = guide.guidance,
-                        latitude = guide.y,
-                        longitude = guide.x,
-                        distance = guide.distance
+                        type = turnType,
+                        guidance = description,
+                        latitude = lat,
+                        longitude = lon,
+                        distance = guideDist
                     });
-                    guideCoords.Add($"{guide.x:F6},{guide.y:F6}");
+
+                    guideCoords.Add($"{lon:F6},{lat:F6}");
                 }
             }
-
-            if (section.roads != null)
+            else if (geomType == "LineString")
             {
-                foreach (KakaoRoad road in section.roads)
-                {
-                    if (road.vertexes == null) continue;
-                    for (int i = 0; i < road.vertexes.Length - 1; i += 2)
-                    {
-                        double lon = road.vertexes[i];
-                        double lat = road.vertexes[i + 1];
-                        string coordKey = $"{lon:F6},{lat:F6}";
+                // 경로점 생성
+                var coords = geometry.ContainsKey("coordinates") ? geometry["coordinates"] as List<object> : null;
+                if (coords == null) continue;
 
-                        route.points.Add(new RoutePoint
-                        {
-                            latitude = lat,
-                            longitude = lon,
-                            isAnchorPoint = guideCoords.Contains(coordKey)
-                        });
-                    }
+                foreach (var coordObj in coords)
+                {
+                    var coord = coordObj as List<object>;
+                    if (coord == null || coord.Count < 2) continue;
+
+                    double lon = Convert.ToDouble(coord[0]);
+                    double lat = Convert.ToDouble(coord[1]);
+                    string coordKey = $"{lon:F6},{lat:F6}";
+
+                    route.points.Add(new RoutePoint
+                    {
+                        latitude = lat,
+                        longitude = lon,
+                        isAnchorPoint = guideCoords.Contains(coordKey)
+                    });
                 }
             }
+        }
+
+        if (route.points.Count < 2)
+        {
+            Debug.LogError("TMAP 경로 파싱: 경로점이 2개 미만");
+            return null;
         }
 
         DensifyRoutePoints(route, 4.0); // 4m 간격으로 보간

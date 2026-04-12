@@ -11,6 +11,7 @@ public static class LocalApiKeySync
     private class LocalApiKeys
     {
         public string kakaoRestApiKey;
+        public string tmapApiKey;
         public string androidCloudServicesApiKey;
         public string iosCloudServicesApiKey;
     }

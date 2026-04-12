@@ -2167,29 +2167,33 @@ public class ARUIManager : MonoBehaviour
         }
     }
 
-    // 카카오 모빌리티 guide.type → 심볼 매핑
-    // 참고: 1=직진, 2=좌회전, 3=우회전, 5=좌측방향, 6=우측방향, 7=유턴, 8-11=방향전환, 88=도착 등
+    // TMAP 보행자 길찾기 turnType → 심볼 매핑
     string GetTurnSymbol(int type)
     {
         switch (type)
         {
-            case 1: return "↑"; // 직진
-            case 2: return "↖"; // 좌회전
-            case 3: return "↗"; // 우회전
-            case 4: return "↓"; // 직진 유지/반대
-            case 5: return "←"; // 좌측방향
-            case 6: return "→"; // 우측방향
-            case 7: return "↺"; // 유턴
-            case 8: return "↰"; // 8시 방향
-            case 9: return "↱"; // 10시 방향
-            case 10: return "↲"; // 5시 방향
-            case 11: return "↳"; // 7시 방향
-            case 12: return "↖"; // 좌측 5시
-            case 13: return "↗"; // 우측 5시
-            case 14: return "↰"; // 좌측 7시
-            case 15: return "↱"; // 우측 7시
-            case 88: return "●"; // 도착
-            case 100: return "↑"; // 출발
+            case 11: return "↑";  // 직진
+            case 12: return "↖";  // 좌회전
+            case 13: return "↗";  // 우회전
+            case 14: return "↺";  // U턴
+            case 16: return "↰";  // 8시 좌회전
+            case 17: return "↖";  // 10시 좌회전
+            case 18: return "↗";  // 2시 우회전
+            case 19: return "↳";  // 4시 우회전
+            case 125: return "⌒"; // 육교
+            case 126: return "▼"; // 지하보도
+            case 127: return "⊓"; // 계단
+            case 128: return "⁄"; // 경사로
+            case 200: return "↑"; // 출발
+            case 201: return "●"; // 도착
+            case 211: // 횡단보도
+            case 212:
+            case 213:
+            case 214:
+            case 215:
+            case 216:
+            case 217: return "⊞"; // 횡단보도
+            case 218: return "⊡"; // 엘리베이터
             default: return "↑";
         }
     }
