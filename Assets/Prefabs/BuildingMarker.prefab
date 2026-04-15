@@ -49,6 +49,7 @@ MonoBehaviour:
   activeScale: 0.54
   animSpeed: 8
   labelHeight: 1.4
+  previewDotSize: 0.6
   titleFontSize: 8.7
   subtitleFontSize: 4.8
   buttonPlateSize: {x: 10.8, y: 4.5}

@@ -35,13 +35,6 @@ public class GeospatialManager : MonoBehaviour
         public string iosCloudServicesApiKey;
     }
 
-    private class VisibleBuildingCandidate
-    {
-        public BuildingData building;
-        public Vector3 viewportPoint;
-        public float distance;
-    }
-
     private class SearchDiagnostics
     {
         public int commercialRequestCount;
@@ -127,7 +120,7 @@ public class GeospatialManager : MonoBehaviour
     public float debugFrontMarkerHeightOffset = -0.2f; // 카메라 기준 높이 오프셋
     public float debugFrontMarkerHorizontalSpacing = 0.7f; // 여러 마커 간 가로 간격
     public float anchorPreviewRadius = 250.0f; // 점으로 보여줄 앵커 반경
-    public int maxPreviewAnchors = 10;       // 동시에 보여줄 최대 앵커 수
+    public int maxPreviewAnchors = 3;       // 동시에 보여줄 최대 앵커 수
     public float anchorCreationRadius = 150.0f; // 현재 위치 기준 실제 생성 반경
     public int maxWorldTextMarkers = 20; // 후보로 유지할 최대 건물 수
     public int anchorCreateYieldInterval = 1; // 앵커 몇 개마다 한 프레임 양보할지
@@ -182,11 +175,8 @@ public class GeospatialManager : MonoBehaviour
     private BuildingData _selectedBuilding;// 사용자가 선택한 건물 정보  
     private Dictionary<string, ARGeospatialAnchor> _buildingAnchors = new Dictionary<string, ARGeospatialAnchor>();
     private List<BuildingData> _anchorCandidateBuildings = new List<BuildingData>();
-    private string _activeAnchorBuildingKey = string.Empty;
     private Coroutine _activeAnchorCreationCoroutine;
-    private BuildingData _pendingAnchorBuilding;
-    private string _pendingAnchorBuildingKey = string.Empty;
-    private float _pendingAnchorDetectedAt = -1f;
+    private string _lastAnchorPoolSignature = string.Empty;
     // 위치 기반 데이터 관리(건물 이름을 키로 앵커 참조 저장)
     private LocationInfo _lastLoadedLocation;
     private bool _isDataLoaded = false;
@@ -195,6 +185,7 @@ public class GeospatialManager : MonoBehaviour
     private bool _isAnchorSetupInProgress = false;
     public bool isNavigationActive = false;
     private readonly List<string> _anchorDebugLines = new List<string>();
+    private string _lastDetectionDebugSignature = string.Empty;
 
     void Awake()
     {
@@ -396,9 +387,28 @@ public class GeospatialManager : MonoBehaviour
     // --- Building Detection Logic ---
     void CheckBuildingDetection() // 카메라 시점과 위치를 기반으로 가장 적합한 건물 감지 및 UI 업데이트
     {
-        List<VisibleBuildingCandidate> visibleCandidates = GetVisibleBuildingCandidates();
-        BuildingData bestTarget = FindBestTargetFromExistingAnchors(visibleCandidates);
-        UpdatePreviewMarkers(visibleCandidates, bestTarget);
+        GeospatialPose pose = EarthManager != null ? EarthManager.CameraGeospatialPose : default(GeospatialPose);
+        bool isEarthTracking = EarthManager != null && EarthManager.EarthTrackingState == TrackingState.Tracking;
+        AnchorVisibilitySelection selection = AnchorVisibilityPlanner.BuildSelection(
+            _anchorCandidateBuildings,
+            pose,
+            isEarthTracking,
+            35.0f,
+            anchorPreviewRadius,
+            detectionAngle,
+            _cameraTransform != null ? _cameraTransform.forward : Vector3.forward,
+            verticalAngleLimit,
+            detectionRadius,
+            forwardGroupViewportThreshold,
+            groupedCandidateDistanceBias,
+            centerViewportThreshold,
+            maxPreviewAnchors);
+        List<VisibleBuildingCandidate> visibleCandidates = selection.visibleCandidates;
+        List<VisibleBuildingCandidate> topCandidates = selection.topCandidates;
+        BuildingData bestTarget = selection.focusedBuilding;
+        UpdateDetectionDebugState(selection);
+        RequestAnchorPoolForCandidates(topCandidates);
+        UpdatePreviewMarkers(topCandidates, bestTarget);
 
         if (bestTarget != null)
         {
@@ -413,7 +423,6 @@ public class GeospatialManager : MonoBehaviour
                 UpdateMarkerScale(bestTarget);
             }
 
-            RequestAnchorForBuilding(bestTarget);
             arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
         }
         else
@@ -429,9 +438,6 @@ public class GeospatialManager : MonoBehaviour
                 _selectedBuilding = null;
             }
 
-            _pendingAnchorBuilding = null;
-            _pendingAnchorBuildingKey = string.Empty;
-            _pendingAnchorDetectedAt = -1f;
             arUIManager?.SetWorldInfoDetailButtonState(null, false);
 
             if (visibleCandidates.Count > 0)
@@ -443,6 +449,21 @@ public class GeospatialManager : MonoBehaviour
                 arUIManager.SetScanningMode();
             }
         }
+    }
+
+    void UpdateDetectionDebugState(AnchorVisibilitySelection selection)
+    {
+        string signature = AnchorVisibilityPlanner.BuildDetectionSignature(selection);
+        if (signature == _lastDetectionDebugSignature)
+        {
+            return;
+        }
+
+        _lastDetectionDebugSignature = signature;
+        AppendAnchorDebug($"Visible count: {selection?.visibleCandidates?.Count ?? 0}");
+        AppendAnchorDebug($"Visible list: {AnchorVisibilityPlanner.FormatCandidateList(selection?.visibleCandidates)}");
+        AppendAnchorDebug($"Top candidates: {AnchorVisibilityPlanner.FormatCandidateList(selection?.topCandidates)}");
+        AppendAnchorDebug($"Focused: {TrimDebugLabel(selection?.focusedBuilding?.buildingName ?? "none")}");
     }
 
     void UpdateMarkerScale(BuildingData targetBuilding)
@@ -486,8 +507,14 @@ public class GeospatialManager : MonoBehaviour
         arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
 
-    void UpdatePreviewMarkers(List<VisibleBuildingCandidate> visibleCandidates, BuildingData selectedBuilding)
+    void UpdatePreviewMarkers(List<VisibleBuildingCandidate> previewCandidates, BuildingData selectedBuilding)
     {
+        HashSet<string> previewKeys = new HashSet<string>(
+            (previewCandidates ?? new List<VisibleBuildingCandidate>())
+                .Where(candidate => candidate?.building != null)
+                .Select(candidate => GetBuildingAnchorKey(candidate.building))
+                .Where(key => !string.IsNullOrWhiteSpace(key)));
+
         foreach (var building in _autoGeneratedBuildingList)
         {
             string buildingKey = GetBuildingAnchorKey(building);
@@ -503,8 +530,9 @@ public class GeospatialManager : MonoBehaviour
             }
 
             ApplyMarkerPlacement(marker, 0, 1);
-            marker.SetInfoVisible(enableWorldTextMarker);
-            marker.SetState(enableWorldTextMarker
+            bool isPreviewTarget = previewKeys.Contains(buildingKey);
+            marker.SetInfoVisible(enableWorldTextMarker && isPreviewTarget);
+            marker.SetState(enableWorldTextMarker && isPreviewTarget
                 ? BuildingMarker.MarkerVisualState.Preview
                 : BuildingMarker.MarkerVisualState.Hidden);
         }
@@ -548,6 +576,27 @@ public class GeospatialManager : MonoBehaviour
 
         _currentActiveMarker = null;
         arUIManager?.SetWorldInfoDetailButtonState(null, false);
+    }
+
+    void RequestAnchorPoolForCandidates(List<VisibleBuildingCandidate> topCandidates)
+    {
+        List<BuildingData> desiredBuildings = AnchorPoolPlanner.BuildDesiredBuildings(topCandidates);
+        string signature = AnchorPoolPlanner.BuildPoolSignature(desiredBuildings);
+        if (signature == _lastAnchorPoolSignature)
+        {
+            return;
+        }
+
+        _lastAnchorPoolSignature = signature;
+        AppendAnchorDebug($"Anchor pool target: {desiredBuildings.Count}");
+
+        if (_activeAnchorCreationCoroutine != null)
+        {
+            StopCoroutine(_activeAnchorCreationCoroutine);
+            _activeAnchorCreationCoroutine = null;
+        }
+
+        _activeAnchorCreationCoroutine = StartCoroutine(SyncAnchorPool(desiredBuildings));
     }
 
     float GetDistanceToBuilding(BuildingData building)
@@ -1732,11 +1781,8 @@ public class GeospatialManager : MonoBehaviour
 
         foreach (var anchor in _buildingAnchors.Values) if (anchor != null) Destroy(anchor.gameObject);
         _buildingAnchors.Clear();
-        _activeAnchorBuildingKey = string.Empty;
         ResetAllMarkers();
-        _pendingAnchorBuilding = null;
-        _pendingAnchorBuildingKey = string.Empty;
-        _pendingAnchorDetectedAt = -1f;
+        _lastAnchorPoolSignature = string.Empty;
 
         List<BuildingData> targetBuildings = GetBuildingsForAnchorCreation();
         _anchorCandidateBuildings = targetBuildings;
@@ -1748,62 +1794,55 @@ public class GeospatialManager : MonoBehaviour
         _isAnchorSetupInProgress = false;
     }
 
-    void RequestAnchorForBuilding(BuildingData building)
+    IEnumerator SyncAnchorPool(List<BuildingData> desiredBuildings)
     {
-        if (building == null)
+        _isAnchorSetupInProgress = true;
+        HashSet<string> desiredKeys = new HashSet<string>(
+            (desiredBuildings ?? new List<BuildingData>())
+                .Where(building => building != null)
+                .Select(GetBuildingAnchorKey)
+                .Where(key => !string.IsNullOrWhiteSpace(key)));
+
+        List<string> keysToRemove = _buildingAnchors.Keys
+            .Where(existingKey => !desiredKeys.Contains(existingKey))
+            .ToList();
+
+        foreach (string removeKey in keysToRemove)
         {
-            return;
+            if (_buildingAnchors.TryGetValue(removeKey, out ARGeospatialAnchor existingAnchor) && existingAnchor != null)
+            {
+                Destroy(existingAnchor.gameObject);
+            }
+
+            _buildingAnchors.Remove(removeKey);
         }
 
-        string buildingKey = GetBuildingAnchorKey(building);
-        if (string.IsNullOrWhiteSpace(buildingKey))
+        _currentActiveMarker = null;
+
+        foreach (BuildingData building in desiredBuildings)
         {
-            return;
+            if (building == null)
+            {
+                continue;
+            }
+
+            string buildingKey = GetBuildingAnchorKey(building);
+            if (string.IsNullOrWhiteSpace(buildingKey) || _buildingAnchors.ContainsKey(buildingKey))
+            {
+                continue;
+            }
+
+            yield return StartCoroutine(CreateAnchorForBuilding(building));
         }
 
-        if (_pendingAnchorBuildingKey != buildingKey)
-        {
-            _pendingAnchorBuilding = building;
-            _pendingAnchorBuildingKey = buildingKey;
-            _pendingAnchorDetectedAt = Time.time;
-            return;
-        }
-
-        if (Time.time - _pendingAnchorDetectedAt < Mathf.Max(0f, selectedAnchorCreateDelay))
-        {
-            return;
-        }
-
-        if (_activeAnchorBuildingKey == buildingKey && _buildingAnchors.ContainsKey(buildingKey))
-        {
-            return;
-        }
-
-        if (_activeAnchorCreationCoroutine != null)
-        {
-            StopCoroutine(_activeAnchorCreationCoroutine);
-        }
-
-        _activeAnchorCreationCoroutine = StartCoroutine(CreateAnchorForBuilding(_pendingAnchorBuilding));
+        AppendAnchorDebug($"Anchor pool active: {_buildingAnchors.Count}");
+        _isAnchorSetupInProgress = false;
+        _activeAnchorCreationCoroutine = null;
     }
 
     IEnumerator CreateAnchorForBuilding(BuildingData building)
     {
-        _isAnchorSetupInProgress = true;
         string buildingKey = GetBuildingAnchorKey(building);
-
-        foreach (var existingAnchor in _buildingAnchors.Values)
-        {
-            if (existingAnchor != null)
-            {
-                Destroy(existingAnchor.gameObject);
-            }
-        }
-
-        _buildingAnchors.Clear();
-        _currentActiveMarker = null;
-        _activeAnchorBuildingKey = string.Empty;
-
         AppendAnchorDebug($"Anchor create start: {TrimDebugLabel(building.buildingName)}");
         yield return null;
 
@@ -1816,13 +1855,10 @@ public class GeospatialManager : MonoBehaviour
         if (anchor == null)
         {
             AppendAnchorDebug($"Anchor create fail: {TrimDebugLabel(building.buildingName)}");
-            _isAnchorSetupInProgress = false;
-            _activeAnchorCreationCoroutine = null;
             yield break;
         }
 
         _buildingAnchors[buildingKey] = anchor;
-        _activeAnchorBuildingKey = buildingKey;
         AppendAnchorDebug($"Anchor create ok: {TrimDebugLabel(building.buildingName)}");
 
         if (enableWorldTextMarker && buildingMarkerPrefab != null)
@@ -1842,8 +1878,7 @@ public class GeospatialManager : MonoBehaviour
                     building.buildingName,
                     string.IsNullOrWhiteSpace(building.description) ? "장소 정보" : building.description);
                 marker.SetInfoVisible(true);
-                marker.SetState(BuildingMarker.MarkerVisualState.Selected, true);
-                _currentActiveMarker = marker;
+                marker.SetState(BuildingMarker.MarkerVisualState.Preview, true);
                 AppendAnchorDebug($"TEXT ready: {TrimDebugLabel(building.buildingName)}");
             }
             else
@@ -1859,9 +1894,6 @@ public class GeospatialManager : MonoBehaviour
         {
             AppendAnchorDebug($"TEXT prefab missing: {TrimDebugLabel(building.buildingName)}");
         }
-
-        _isAnchorSetupInProgress = false;
-        _activeAnchorCreationCoroutine = null;
     }
 
     List<BuildingData> GetBuildingsForAnchorCreation()
@@ -1929,6 +1961,8 @@ public class GeospatialManager : MonoBehaviour
     void ResetAnchorDebugOverlay()
     {
         _anchorDebugLines.Clear();
+        _lastDetectionDebugSignature = string.Empty;
+        _lastAnchorPoolSignature = string.Empty;
         arUIManager?.ClearDebugOverlay();
     }
 
@@ -1985,148 +2019,6 @@ public class GeospatialManager : MonoBehaviour
         return value.Length <= 18 ? value : $"{value.Substring(0, 18)}...";
     }
 
-    //건물 인식 방식 결정
-    BuildingData FindBestTargetFromExistingAnchors(List<VisibleBuildingCandidate> visibleCandidates) // 카메라 시점과 위치를 기반으로 가장 적합한 건물 감지
-    {
-        float pitchAngle = 90.0f - Vector3.Angle(_cameraTransform.forward, Vector3.up);
-        if (Mathf.Abs(pitchAngle) > verticalAngleLimit) return null;
-
-        List<VisibleBuildingCandidate> frontMostCandidates = GetFrontMostCandidates(visibleCandidates);
-        BuildingData bestTarget = null;
-        BuildingData fallbackTarget = null;
-        float bestScore = float.MaxValue;
-        float fallbackScore = float.MaxValue;
-        Vector2 viewportCenter = new Vector2(0.5f, 0.5f);
-        float relaxedViewportThreshold = Mathf.Min(0.38f, centerViewportThreshold + 0.1f);
-
-        foreach (VisibleBuildingCandidate candidate in frontMostCandidates)
-        {
-            Vector2 viewportOffset = new Vector2(
-                Mathf.Abs(candidate.viewportPoint.x - viewportCenter.x),
-                Mathf.Abs(candidate.viewportPoint.y - viewportCenter.y));
-            bool withinPrimaryFocus = viewportOffset.x <= centerViewportThreshold && viewportOffset.y <= centerViewportThreshold;
-            bool withinRelaxedFocus = viewportOffset.x <= relaxedViewportThreshold && viewportOffset.y <= relaxedViewportThreshold;
-            float focusScore = viewportOffset.x + viewportOffset.y;
-            float score = focusScore + candidate.distance * 0.0015f;
-
-            if (withinPrimaryFocus && score < bestScore)
-            {
-                bestScore = score;
-                bestTarget = candidate.building;
-            }
-
-            if (withinRelaxedFocus && score < fallbackScore)
-            {
-                fallbackScore = score;
-                fallbackTarget = candidate.building;
-            }
-        }
-
-        return bestTarget ?? fallbackTarget;
-    }
-
-    List<VisibleBuildingCandidate> GetVisibleBuildingCandidates()
-    {
-        List<VisibleBuildingCandidate> visibleBuildings = new List<VisibleBuildingCandidate>();
-
-        if (_anchorCandidateBuildings == null || _anchorCandidateBuildings.Count == 0)
-        {
-            return visibleBuildings;
-        }
-
-        if (EarthManager == null || EarthManager.EarthTrackingState != TrackingState.Tracking)
-        {
-            return visibleBuildings;
-        }
-
-        GeospatialPose pose = EarthManager.CameraGeospatialPose;
-        if (pose.HeadingAccuracy > 35.0)
-        {
-            return visibleBuildings;
-        }
-
-        foreach (BuildingData building in _anchorCandidateBuildings)
-        {
-            if (building == null)
-            {
-                continue;
-            }
-
-            float distance = (float)HaversineDistance(
-                pose.Latitude,
-                pose.Longitude,
-                building.latitude,
-                building.longitude);
-
-            if (distance > anchorPreviewRadius)
-            {
-                continue;
-            }
-
-            float signedHeadingDelta = Mathf.DeltaAngle(
-                (float)pose.Heading,
-                (float)CalculateBearingDegrees(pose.Latitude, pose.Longitude, building.latitude, building.longitude));
-            float normalizedOffset = signedHeadingDelta / Mathf.Max(1f, detectionAngle);
-            float viewportX = 0.5f + Mathf.Clamp(normalizedOffset, -0.5f, 0.5f);
-
-            if (viewportX < 0f || viewportX > 1f)
-            {
-                continue;
-            }
-
-            visibleBuildings.Add(new VisibleBuildingCandidate
-            {
-                building = building,
-                viewportPoint = new Vector3(viewportX, 0.5f, distance),
-                distance = distance
-            });
-        }
-
-        return visibleBuildings;
-    }
-
-    double CalculateBearingDegrees(double lat1, double lon1, double lat2, double lon2)
-    {
-        double phi1 = lat1 * Mathf.Deg2Rad;
-        double phi2 = lat2 * Mathf.Deg2Rad;
-        double deltaLon = (lon2 - lon1) * Mathf.Deg2Rad;
-
-        double y = Math.Sin(deltaLon) * Math.Cos(phi2);
-        double x = Math.Cos(phi1) * Math.Sin(phi2) -
-                   Math.Sin(phi1) * Math.Cos(phi2) * Math.Cos(deltaLon);
-        double bearing = Math.Atan2(y, x) * Mathf.Rad2Deg;
-        return (bearing + 360.0) % 360.0;
-    }
-
-    List<VisibleBuildingCandidate> GetFrontMostCandidates(List<VisibleBuildingCandidate> visibleCandidates)
-    {
-        List<VisibleBuildingCandidate> sortedCandidates = visibleCandidates
-            .Where(candidate => candidate.distance <= detectionRadius)
-            .OrderBy(candidate => candidate.distance)
-            .ToList();
-
-        List<VisibleBuildingCandidate> frontMostCandidates = new List<VisibleBuildingCandidate>();
-
-        foreach (VisibleBuildingCandidate candidate in sortedCandidates)
-        {
-            Vector2 candidateViewport = new Vector2(candidate.viewportPoint.x, candidate.viewportPoint.y);
-            bool isRearCandidate = frontMostCandidates.Any(existing =>
-            {
-                Vector2 existingViewport = new Vector2(existing.viewportPoint.x, existing.viewportPoint.y);
-                float viewportDistance = Vector2.Distance(candidateViewport, existingViewport);
-                return viewportDistance <= forwardGroupViewportThreshold &&
-                       candidate.distance >= existing.distance + groupedCandidateDistanceBias;
-            });
-
-            if (!isRearCandidate)
-            {
-                frontMostCandidates.Add(candidate);
-            }
-        }
-
-        return frontMostCandidates;
-    }
-
     bool ShouldRenderWorldMarkers()
     {
         return showNearbyAnchors && (markerRenderMode == MarkerRenderMode.World3D || markerRenderMode == MarkerRenderMode.Both);
@@ -2179,6 +2071,8 @@ public class GeospatialManager : MonoBehaviour
         _currentDetectedBuilding = null;
         _selectedBuilding = null;
         _currentActiveMarker = null;
+        _lastDetectionDebugSignature = string.Empty;
+        _lastAnchorPoolSignature = string.Empty;
         arUIManager?.SetScanningMode();
     }
 }

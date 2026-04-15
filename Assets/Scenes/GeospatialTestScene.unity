@@ -804,7 +804,7 @@ MonoBehaviour:
   debugFrontMarkerHeightOffset: -0.2
   debugFrontMarkerHorizontalSpacing: 0.7
   anchorPreviewRadius: 250
-  maxPreviewAnchors: 10
+  maxPreviewAnchors: 3
   anchorCreationRadius: 150
   maxWorldTextMarkers: 20
   anchorCreateYieldInterval: 1
