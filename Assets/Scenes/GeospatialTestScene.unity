@@ -814,9 +814,9 @@ MonoBehaviour:
   markerRenderMode: 1
   markerAltitudeOffsetMeters: 1
   worldMarkerLocalOffsetMeters: 0
-  worldMarkerShellDistanceScale: 0.45
+  worldMarkerShellDistanceScale: 0.675
   worldMarkerShellMinRadius: 1.5
-  worldMarkerShellMaxRadius: 8
+  worldMarkerShellMaxRadius: 12
   worldMarkerShellNearLimitFactor: 0.35
   worldMarkerHeightDistanceScale: 0.08
   worldMarkerMinHeightAboveCamera: 0.25

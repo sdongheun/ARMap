@@ -137,9 +137,9 @@ public class GeospatialManager : MonoBehaviour
     public MarkerRenderMode markerRenderMode = MarkerRenderMode.World3D; // 2D/3D 마커 렌더 방식
     public double markerAltitudeOffsetMeters = 1.0; // 지면 고도 기준 앵커 오프셋
     public float worldMarkerLocalOffsetMeters = 0.0f; // 앵커 기준 3D 마커 추가 높이
-    public float worldMarkerShellDistanceScale = 0.45f; // 카메라와 건물 거리 대비 텍스트 전진 비율
+    public float worldMarkerShellDistanceScale = 0.675f; // 카메라와 건물 거리 대비 텍스트 전진 비율
     public float worldMarkerShellMinRadius = 1.5f; // 텍스트가 건물 중심에서 최소 떨어지는 거리
-    public float worldMarkerShellMaxRadius = 8.0f; // 텍스트가 건물 중심에서 최대 떨어지는 거리
+    public float worldMarkerShellMaxRadius = 12.0f; // 텍스트가 건물 중심에서 최대 떨어지는 거리
     public float worldMarkerShellNearLimitFactor = 0.35f; // 아주 가까울 때 카메라-건물 거리 대비 상한 비율
     public float worldMarkerHeightDistanceScale = 0.08f; // 카메라-건물 거리 대비 텍스트 시각 높이 비율
     public float worldMarkerMinHeightAboveCamera = 0.25f; // 카메라 기준 최소 텍스트 높이
