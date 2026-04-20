@@ -4,49 +4,34 @@ using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine.Serialization;
 
 public class ARUIManager : MonoBehaviour
 {
     // --- Inspector Variables ---
-    [Header("1. Main Cards (1~3)")]
+    [Header("1. Main Cards")]
     public GameObject scanningCard;
     public GameObject detectedCard;
-    public GameObject quickInfoCard;
 
-    [Header("2. Quick Info Content")]
-    public Image quickInfoIcon;
-    [FormerlySerializedAs("quickTitleText")]
-    public TextMeshProUGUI quickBuildingNameText;
-    public TextMeshProUGUI quickCategoryText; 
-    [FormerlySerializedAs("quickAddressText")]
-    public TextMeshProUGUI quickDistanceText;
-    
-    [Header("3. Main Buttons")]
-    [FormerlySerializedAs("openDetailButton")]
-    public Button quickInfoTapTarget;
-
-    [Header("4. Icons")]
+    [Header("2. Icons")]
     public Sprite iconScanning;
     public Sprite iconDetected;
     public Sprite iconBuilding;
 
-    [Header("5. Detail View (Page 4)")]
+    [Header("3. Detail View (Page 4)")]
     public ARDetailPanelDocumentController uiToolkitDetailPanel;
 
-    [Header("6. Animation Settings")]
+    [Header("4. Animation Settings")]
     public float animDuration = 0.3f; 
     public float slideOffset = 150f; 
     public float statusCardPosY = 0f;    
-    public float quickCardPosY = -50f;   
 
-    [Header("7. Toast Message")]
+    [Header("5. Toast Message")]
     public GameObject toastPanel;
     public TextMeshProUGUI toastText;
     public float toastDuration = 2.0f;
     private Coroutine _toastRoutine;
 
-    [Header("10. Navigation UI - 검색 패널")]
+    [Header("6. Navigation UI - 검색 패널")]
     public GameObject navigationSearchPanel;
     public TMP_InputField destinationInputField;
     public Button searchButton;
@@ -54,7 +39,7 @@ public class ARUIManager : MonoBehaviour
     public GameObject searchResultItemPrefab;
     public Button closeSearchButton;
 
-    [Header("11. Navigation HUD")]
+    [Header("7. Navigation HUD")]
     public GameObject navigationHUD;
     public TextMeshProUGUI remainingDistanceText;
     public TextMeshProUGUI nextGuideText;
@@ -62,11 +47,11 @@ public class ARUIManager : MonoBehaviour
     public Button recalibrateButton;
     public RectTransform offScreenIndicator;
 
-    [Header("12. Navigation Buttons")]
+    [Header("8. Navigation Buttons")]
     public Button mainNavigateButton;
     public Button detailNavigateButton;
     public Button worldInfoDetailButton;
-    [Header("8. Center Reticle")]
+    [Header("9. Center Reticle")]
     public bool showCenterReticle = true;
     public Color centerReticleColor = new Color(1f, 1f, 1f, 0.72f);
     public float centerReticleBarLength = 16f;
@@ -78,7 +63,6 @@ public class ARUIManager : MonoBehaviour
     public float centerReticlePulseScale = 1.04f;
 
     // --- Internal Variables ---
-    public event Action OnClickDetail;
     public event Action OnDetailOpened;
     public event Action OnDetailClosed;
     public event Action OnNavigateRequested;
@@ -105,9 +89,9 @@ public class ARUIManager : MonoBehaviour
     private UIState currentState = UIState.None;
     private BuildingData _currentDetailData;
 
-    private RectTransform _scanRect, _detectRect, _quickRect;
-    private CanvasGroup _scanGroup, _detectGroup, _quickGroup;
-    private Coroutine _scanRoutine, _detectRoutine, _quickRoutine;
+    private RectTransform _scanRect, _detectRect;
+    private CanvasGroup _scanGroup, _detectGroup;
+    private Coroutine _scanRoutine, _detectRoutine;
     private RectTransform _canvasRect;
     private Canvas _canvas;
     private RectTransform _centerReticleRoot;
@@ -117,27 +101,22 @@ public class ARUIManager : MonoBehaviour
     private TextMeshProUGUI _debugOverlayText;
     private Image _worldInfoDetailButtonImage;
     private TextMeshProUGUI _worldInfoDetailButtonText;
-    private string _lastQuickInfoId;
     private BuildingData _worldInfoButtonData;
-    private TextMeshProUGUI quickTitleText => quickBuildingNameText;
+    private TMP_FontAsset SharedTMPFont => toastText != null && toastText.font != null
+        ? toastText.font
+        : TMP_Settings.instance != null ? TMP_Settings.defaultFontAsset : null;
+    private Material SharedTMPMaterial => toastText != null ? toastText.fontSharedMaterial : null;
 
     void Awake()
     {
         _scanRect = scanningCard.GetComponent<RectTransform>(); _scanGroup = scanningCard.GetComponent<CanvasGroup>();
         _detectRect = detectedCard.GetComponent<RectTransform>(); _detectGroup = detectedCard.GetComponent<CanvasGroup>();
-        _quickRect = quickInfoCard.GetComponent<RectTransform>(); _quickGroup = quickInfoCard.GetComponent<CanvasGroup>();
         _canvasRect = GetComponent<RectTransform>();
         _canvas = GetComponent<Canvas>();
     }
 
     void Start()
     {
-        ConfigureQuickInfoCardLayout();
-        if (quickInfoTapTarget != null)
-        {
-            quickInfoTapTarget.onClick.AddListener(() => OnClickDetail?.Invoke());
-        }
-
         if (uiToolkitDetailPanel != null)
         {
             uiToolkitDetailPanel.OnClosed += HandleUIToolkitDetailClosed;
@@ -163,7 +142,6 @@ public class ARUIManager : MonoBehaviour
 
         InitializeCard(_scanRect, _scanGroup, true, statusCardPosY);
         InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
-        InitializeCard(_quickRect, _quickGroup, false, quickCardPosY);
 
         if (navigationSearchPanel != null) navigationSearchPanel.SetActive(false);
         if (navigationHUD != null) navigationHUD.SetActive(false);
@@ -171,9 +149,7 @@ public class ARUIManager : MonoBehaviour
 
         EnsureNavigationButton();
         EnsureWorldInfoDetailButton();
-        InitializeQuickInfoCard(false);
         EnsureCenterReticle();
-        SetPrimaryButtonsVisible(false);
     }
 
     void Update()
@@ -187,11 +163,8 @@ public class ARUIManager : MonoBehaviour
     {
         if (currentState == UIState.Scanning) return;
         currentState = UIState.Scanning;
-        _lastQuickInfoId = null;
-        SetPrimaryButtonsVisible(false);
         ShowCard(scanningCard, _scanRect, _scanGroup, statusCardPosY, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
-        HideQuickInfoCard();
     }
 
     // 화면 상태 전환 (2번: 건물 감지됨)
@@ -199,11 +172,8 @@ public class ARUIManager : MonoBehaviour
     {
         if (currentState == UIState.Detected) return;
         currentState = UIState.Detected;
-        _lastQuickInfoId = null;
-        SetPrimaryButtonsVisible(false);
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         ShowCard(detectedCard, _detectRect, _detectGroup, statusCardPosY, ref _detectRoutine);
-        HideQuickInfoCard();
     }
 
     // 화면 상태 전환 (3번: 요약 정보 표시)
@@ -219,48 +189,15 @@ public class ARUIManager : MonoBehaviour
             return;
         }
 
-        string infoId = BuildQuickInfoId(data);
-        bool hasChanged = _lastQuickInfoId != infoId;
         bool enteringQuickInfo = currentState != UIState.QuickInfo;
         currentState = UIState.QuickInfo;
-        _lastQuickInfoId = infoId;
-        if (quickInfoIcon != null) quickInfoIcon.sprite = iconBuilding;
-        if (quickBuildingNameText != null)
-        {
-            quickBuildingNameText.text = data.buildingName;
-        }
-        if (quickCategoryText != null)
-        {
-            quickCategoryText.text = string.IsNullOrEmpty(data.description) ? "건물 정보" : data.description;
-        }
-        if (quickDistanceText != null)
-        {
-            quickDistanceText.text = distanceMeters >= 0f
-                ? $"약 {Mathf.RoundToInt(distanceMeters)}m"
-                : (string.IsNullOrEmpty(data.fetchedAddress) ? "위치 정보 없음" : data.fetchedAddress);
-        }
-        SetPrimaryButtonsVisible(false);
-
         if (enteringQuickInfo)
         {
             HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
             HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
-            HideQuickInfoCard();
-        }
-        else if (hasChanged)
-        {
-            HideQuickInfoCard();
         }
     }
     #endregion
-
-    void SetPrimaryButtonsVisible(bool visible)
-    {
-        if (quickInfoTapTarget != null)
-        {
-            quickInfoTapTarget.gameObject.SetActive(visible);
-        }
-    }
 
     void EnsureCenterReticle()
     {
@@ -358,20 +295,7 @@ public class ARUIManager : MonoBehaviour
         _debugOverlayText.raycastTarget = false;
         _debugOverlayText.text = string.Empty;
 
-        TMP_FontAsset fallbackFont = null;
-        if (quickBuildingNameText != null && quickBuildingNameText.font != null)
-        {
-            fallbackFont = quickBuildingNameText.font;
-        }
-        else if (TMP_Settings.instance != null && TMP_Settings.defaultFontAsset != null)
-        {
-            fallbackFont = TMP_Settings.defaultFontAsset;
-        }
-
-        if (fallbackFont != null)
-        {
-            _debugOverlayText.font = fallbackFont;
-        }
+        ApplySharedTextStyle(_debugOverlayText);
 
         _debugOverlayScrollRect.viewport = viewportRect;
         _debugOverlayScrollRect.content = _debugOverlayContent;
@@ -433,6 +357,24 @@ public class ARUIManager : MonoBehaviour
         }
     }
 
+    void ApplySharedTextStyle(TextMeshProUGUI text)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        if (SharedTMPFont != null)
+        {
+            text.font = SharedTMPFont;
+        }
+
+        if (SharedTMPMaterial != null)
+        {
+            text.fontSharedMaterial = SharedTMPMaterial;
+        }
+    }
+
     void CreateCenterReticleBar(string name, Vector2 anchor, Vector2 pivot, Vector2 anchoredPosition, bool horizontal)
     {
         if (_centerReticleRoot == null)
@@ -483,97 +425,6 @@ public class ARUIManager : MonoBehaviour
             c.a *= alpha;
             barImage.color = c;
         }
-    }
-
-    void ConfigureQuickInfoCardLayout()
-    {
-        if (_quickRect == null)
-        {
-            return;
-        }
-
-        if (_quickRect.parent != transform)
-        {
-            _quickRect.SetParent(transform, false);
-            _quickRect.SetAsLastSibling();
-        }
-
-        _quickRect.anchorMin = new Vector2(0f, 0f);
-        _quickRect.anchorMax = new Vector2(1f, 0f);
-        _quickRect.pivot = new Vector2(0.5f, 0f);
-
-        Vector2 offsetMin = _quickRect.offsetMin;
-        Vector2 offsetMax = _quickRect.offsetMax;
-        offsetMin.x = 16f;
-        offsetMax.x = -16f;
-        _quickRect.offsetMin = offsetMin;
-        _quickRect.offsetMax = offsetMax;
-
-        if (quickInfoIcon != null)
-        {
-            RectTransform iconRect = quickInfoIcon.rectTransform;
-            iconRect.anchorMin = new Vector2(0f, 0.5f);
-            iconRect.anchorMax = new Vector2(0f, 0.5f);
-            iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(55f, 18f);
-            iconRect.sizeDelta = new Vector2(48f, 48f);
-            quickInfoIcon.preserveAspect = true;
-        }
-    }
-
-    float GetQuickCardTargetY()
-    {
-        return quickCardPosY > 0f ? quickCardPosY : 20f;
-    }
-
-    float GetQuickCardHiddenY()
-    {
-        return -(_quickRect.sizeDelta.y + 48f);
-    }
-
-    void InitializeQuickInfoCard(bool visible)
-    {
-        if (_quickRect == null || _quickGroup == null) return;
-
-        float targetY = visible ? GetQuickCardTargetY() : GetQuickCardHiddenY();
-        _quickRect.anchoredPosition = new Vector2(0f, targetY);
-        _quickGroup.alpha = visible ? 1f : 0f;
-        if (quickInfoCard != null)
-        {
-            quickInfoCard.SetActive(visible);
-        }
-    }
-
-    void ShowQuickInfoCard(bool animateFromBottom)
-    {
-        if (quickInfoCard == null || _quickRect == null || _quickGroup == null) return;
-        if (_quickRoutine != null) StopCoroutine(_quickRoutine);
-
-        quickInfoCard.SetActive(true);
-        if (animateFromBottom)
-        {
-            _quickRect.anchoredPosition = new Vector2(0f, GetQuickCardHiddenY());
-            _quickGroup.alpha = 0f;
-        }
-
-        _quickRoutine = StartCoroutine(AnimateMove(_quickRect, _quickGroup, GetQuickCardTargetY(), 1f));
-    }
-
-    void HideQuickInfoCard()
-    {
-        if (quickInfoCard == null || _quickRect == null || _quickGroup == null) return;
-        if (_quickRoutine != null) StopCoroutine(_quickRoutine);
-        _quickRoutine = StartCoroutine(AnimateMove(_quickRect, _quickGroup, GetQuickCardHiddenY(), 0f, () => quickInfoCard.SetActive(false)));
-    }
-
-    string BuildQuickInfoId(BuildingData data)
-    {
-        if (data == null)
-        {
-            return string.Empty;
-        }
-
-        return $"{data.buildingName}|{data.latitude:F5}|{data.longitude:F5}";
     }
 
     #region Detail View Control
@@ -760,7 +611,7 @@ public class ARUIManager : MonoBehaviour
         inputField.textViewport = textAreaRect;
         inputField.textComponent = inputTextObj.GetComponent<TextMeshProUGUI>();
         inputField.placeholder = placeholderObj.GetComponent<TextMeshProUGUI>();
-        inputField.fontAsset = quickTitleText != null ? quickTitleText.font : null;
+        inputField.fontAsset = SharedTMPFont;
         destinationInputField = inputField;
 
         // 검색 버튼
@@ -847,11 +698,7 @@ public class ARUIManager : MonoBehaviour
         statusTmp.fontSize = 22f;
         statusTmp.alignment = TextAlignmentOptions.Center;
         statusTmp.color = new Color(0.7f, 0.78f, 0.86f, 1f);
-        if (quickTitleText != null)
-        {
-            statusTmp.font = quickTitleText.font;
-            statusTmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(statusTmp);
         _searchStatusText.SetActive(false);
 
         // 엔터키 서브밋
@@ -920,11 +767,7 @@ public class ARUIManager : MonoBehaviour
         tmp.fontSize = 22f;
         tmp.color = new Color(1f, 1f, 1f, alpha);
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
-        if (quickTitleText != null)
-        {
-            tmp.font = quickTitleText.font;
-            tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(tmp);
         return obj;
     }
 
@@ -957,11 +800,7 @@ public class ARUIManager : MonoBehaviour
         tmp.fontSize = 22f;
         tmp.color = Color.white;
         tmp.alignment = TextAlignmentOptions.Center;
-        if (quickTitleText != null)
-        {
-            tmp.font = quickTitleText.font;
-            tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(tmp);
 
         return btnObj.GetComponent<Button>();
     }
@@ -1079,11 +918,7 @@ public class ARUIManager : MonoBehaviour
             distTmp.fontStyle = FontStyles.Bold;
             distTmp.color = new Color(0.08f, 0.78f, 0.96f, 1f);
             distTmp.alignment = TextAlignmentOptions.MidlineRight;
-            if (quickTitleText != null)
-            {
-                distTmp.font = quickTitleText.font;
-                distTmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-            }
+            ApplySharedTextStyle(distTmp);
         }
 
         return itemObj;
@@ -1116,11 +951,7 @@ public class ARUIManager : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.enableWordWrapping = false;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
-        if (quickTitleText != null)
-        {
-            tmp.font = quickTitleText.font;
-            tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(tmp);
         return tmp;
     }
 
@@ -1166,11 +997,7 @@ public class ARUIManager : MonoBehaviour
         _turnIconText.fontStyle = FontStyles.Bold;
         _turnIconText.alignment = TextAlignmentOptions.Center;
         _turnIconText.color = new Color(0.08f, 0.78f, 0.96f, 1f);
-        if (quickTitleText != null)
-        {
-            _turnIconText.font = quickTitleText.font;
-            _turnIconText.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(_turnIconText);
 
         // 남은 거리 텍스트 (턴 아이콘 오른쪽)
         remainingDistanceText = CreateHUDText("RemainingDistance", navigationHUD.transform,
@@ -1261,11 +1088,7 @@ public class ARUIManager : MonoBehaviour
         riTmp.fontStyle = FontStyles.Bold;
         riTmp.alignment = TextAlignmentOptions.Center;
         riTmp.color = new Color(1f, 0.8f, 0.2f, 1f);
-        if (quickTitleText != null)
-        {
-            riTmp.font = quickTitleText.font;
-            riTmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(riTmp);
         _reroutingIndicator.SetActive(false);
 
         // 화면 밖 방향 표시 인디케이터
@@ -1282,11 +1105,7 @@ public class ARUIManager : MonoBehaviour
             indicatorText.fontStyle = FontStyles.Bold;
             indicatorText.alignment = TextAlignmentOptions.Center;
             indicatorText.color = new Color(0.08f, 0.78f, 0.96f, 0.9f);
-            if (quickTitleText != null)
-            {
-                indicatorText.font = quickTitleText.font;
-                indicatorText.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-            }
+            ApplySharedTextStyle(indicatorText);
             indicatorObj.SetActive(false);
         }
 
@@ -1316,11 +1135,7 @@ public class ARUIManager : MonoBehaviour
         tmp.color = Color.white;
         tmp.enableWordWrapping = false;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
-        if (quickTitleText != null)
-        {
-            tmp.font = quickTitleText.font;
-            tmp.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(tmp);
         return tmp;
     }
 
@@ -1564,11 +1379,7 @@ public class ARUIManager : MonoBehaviour
         btnText.fontSize = 18f;
         btnText.alignment = TextAlignmentOptions.Center;
         btnText.color = Color.white;
-        if (quickTitleText != null)
-        {
-            btnText.font = quickTitleText.font;
-            btnText.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(btnText);
 
         mainNavigateButton = btnObj.GetComponent<Button>();
         mainNavigateButton.onClick.AddListener(() => OnNavigateRequested?.Invoke());
@@ -1610,11 +1421,7 @@ public class ARUIManager : MonoBehaviour
         _worldInfoDetailButtonText.alignment = TextAlignmentOptions.Center;
         _worldInfoDetailButtonText.color = new Color(0.82f, 0.86f, 0.9f, 0.9f);
         _worldInfoDetailButtonText.raycastTarget = false;
-        if (quickTitleText != null)
-        {
-            _worldInfoDetailButtonText.font = quickTitleText.font;
-            _worldInfoDetailButtonText.fontSharedMaterial = quickTitleText.fontSharedMaterial;
-        }
+        ApplySharedTextStyle(_worldInfoDetailButtonText);
 
         worldInfoDetailButton = btnObj.GetComponent<Button>();
         worldInfoDetailButton.onClick.AddListener(() =>
@@ -1641,8 +1448,6 @@ public class ARUIManager : MonoBehaviour
     {
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
-        HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
-        SetPrimaryButtonsVisible(false);
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
     }

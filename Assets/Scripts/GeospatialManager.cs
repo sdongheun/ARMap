@@ -184,13 +184,6 @@ public class GeospatialManager : MonoBehaviour
 
         if (arUIManager != null)
         {
-            arUIManager.OnClickDetail += () => // 상세보기 버튼 클릭 시 처리
-            {
-                if (_selectedBuilding != null)
-                {
-                    arUIManager.OpenDetailView(_selectedBuilding);
-                }
-            };
             arUIManager.OnDetailOpened += () => _isViewingInfo = true;
             arUIManager.OnDetailClosed += () => _isViewingInfo = false;
         }
