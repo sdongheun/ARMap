@@ -114,9 +114,9 @@ public class GeospatialManager : MonoBehaviour
     [Header("Marker Settings")]
     public GameObject buildingMarkerPrefab;  // 건물 마커 프리팹
     public bool showNearbyAnchors = true;    // 근처 앵커 항상 표시
-    public bool debugForceShowAllWorldMarkers = false; // 시야 판정과 무관하게 생성된 3D 마커 강제 표시
-    public bool debugPlaceWorldMarkersInFrontOfCamera = false; // 생성된 3D 마커를 카메라 앞에 강제 배치
-    public float debugFrontMarkerDistance = 2.5f; // 카메라 앞 디버그 거리
+    public bool debugForceShowAllWorldMarkers = true; // 시야 판정과 무관하게 생성된 3D 마커 강제 표시
+    public bool debugPlaceWorldMarkersInFrontOfCamera = true; // 생성된 3D 마커를 카메라 앞에 강제 배치
+    public float debugFrontMarkerDistance = 10.0f; // 카메라 앞 디버그 거리
     public float debugFrontMarkerHeightOffset = -0.2f; // 카메라 기준 높이 오프셋
     public float debugFrontMarkerHorizontalSpacing = 0.7f; // 여러 마커 간 가로 간격
     public float anchorPreviewRadius = 250.0f; // 점으로 보여줄 앵커 반경
@@ -1449,7 +1449,6 @@ public class GeospatialManager : MonoBehaviour
 
         newBuilding.phoneNumber = detailRepresentative.phone;
         newBuilding.placeUrl = detailRepresentative.place_url;
-        newBuilding.zipCode = detailRepresentative.address_name;
 
         newBuilding.facilities = BuildFacilityList(cluster, newBuilding.buildingName, institutionalBuildingToken);
 

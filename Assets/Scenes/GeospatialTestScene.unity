@@ -764,6 +764,7 @@ MonoBehaviour:
   AnchorManager: {fileID: 176907918}
   arUIManager: {fileID: 104506282}
   kakaoRestApiKey: 
+  tmapApiKey: 
   searchRadius: 100
   clusterRadius: 20
   institutionalFacilityAssignmentRadius: 45
@@ -798,9 +799,9 @@ MonoBehaviour:
   - "\uC778\uC81C\uB300 \uC220\uC9D1"
   buildingMarkerPrefab: {fileID: 1601110663320009772, guid: 3fbbe2e020d2d4261a1612ea01e812eb, type: 3}
   showNearbyAnchors: 1
-  debugForceShowAllWorldMarkers: 0
-  debugPlaceWorldMarkersInFrontOfCamera: 0
-  debugFrontMarkerDistance: 2.5
+  debugForceShowAllWorldMarkers: 1
+  debugPlaceWorldMarkersInFrontOfCamera: 1
+  debugFrontMarkerDistance: 10
   debugFrontMarkerHeightOffset: -0.2
   debugFrontMarkerHorizontalSpacing: 0.7
   anchorPreviewRadius: 250

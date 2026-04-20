@@ -8,46 +8,6 @@ using UnityEngine.Serialization;
 
 public class ARUIManager : MonoBehaviour
 {
-    [Serializable]
-    public class ScreenMarkerData
-    {
-        public string id;
-        public string label;
-        public string category;
-        public string address;
-        public float distanceMeters;
-        public Vector2 screenPosition;
-        public bool isSelected;
-    }
-
-    private class ScreenMarkerView
-    {
-        public GameObject root;
-        public RectTransform rectTransform;
-        public Image pinShadowImage;
-        public RectTransform pinShadowRect;
-        public Vector2 pinShadowHiddenPosition;
-        public Vector2 pinShadowShownPosition;
-        public Image pinImage;
-        public RectTransform pinRect;
-        public Vector2 pinHiddenPosition;
-        public Vector2 pinShownPosition;
-        public Image bubbleBackground;
-        public Image bubbleShadow;
-        public RectTransform bubbleShadowRect;
-        public RectTransform bubbleRect;
-        public CanvasGroup bubbleGroup;
-        public Vector2 bubbleHiddenPosition;
-        public Vector2 bubbleShownPosition;
-        public Image bubbleIcon;
-        public TextMeshProUGUI titleText;
-        public TextMeshProUGUI categoryText;
-        public TextMeshProUGUI addressText;
-        public Button bubbleButton;
-        public bool isSelectedTarget;
-        public float selectionLerp;
-    }
-
     // --- Inspector Variables ---
     [Header("1. Main Cards (1~3)")]
     public GameObject scanningCard;
@@ -70,8 +30,6 @@ public class ARUIManager : MonoBehaviour
     public Sprite iconScanning;
     public Sprite iconDetected;
     public Sprite iconBuilding;
-    public Sprite screenMarkerDefaultSprite;
-    public Sprite screenMarkerSelectedSprite;
 
     [Header("5. Detail View (Page 4)")]
     public ARDetailPanelDocumentController uiToolkitDetailPanel;
@@ -118,14 +76,6 @@ public class ARUIManager : MonoBehaviour
     public float centerReticlePulseAlphaMin = 0.32f;
     public float centerReticlePulseAlphaMax = 0.72f;
     public float centerReticlePulseScale = 1.04f;
-    public float screenMarkerCornerRadius = 18f;
-    public Vector2 screenMarkerShadowOffset = new Vector2(0f, -10f);
-    public float screenMarkerShadowExpansion = 10f;
-    public Color screenMarkerShadowColor = new Color(0.08f, 0.12f, 0.2f, 0.22f);
-    public float screenMarkerScaleNearDistance = 5f;
-    public float screenMarkerScaleFarDistance = 50f;
-    public float screenMarkerScaleNearMultiplier = 1.24f;
-    public float screenMarkerScaleFarMultiplier = 0.84f;
 
     // --- Internal Variables ---
     public event Action OnClickDetail;
@@ -160,7 +110,6 @@ public class ARUIManager : MonoBehaviour
     private Coroutine _scanRoutine, _detectRoutine, _quickRoutine;
     private RectTransform _canvasRect;
     private Canvas _canvas;
-    private RectTransform _screenMarkerRoot;
     private RectTransform _centerReticleRoot;
     private RectTransform _debugOverlayRoot;
     private ScrollRect _debugOverlayScrollRect;
@@ -168,9 +117,6 @@ public class ARUIManager : MonoBehaviour
     private TextMeshProUGUI _debugOverlayText;
     private Image _worldInfoDetailButtonImage;
     private TextMeshProUGUI _worldInfoDetailButtonText;
-    private Sprite _screenMarkerPanelSprite;
-    private Texture2D _screenMarkerPanelTexture;
-    private readonly Dictionary<string, ScreenMarkerView> _screenMarkerViews = new Dictionary<string, ScreenMarkerView>();
     private string _lastQuickInfoId;
     private BuildingData _worldInfoButtonData;
     private TextMeshProUGUI quickTitleText => quickBuildingNameText;
@@ -182,22 +128,11 @@ public class ARUIManager : MonoBehaviour
         _quickRect = quickInfoCard.GetComponent<RectTransform>(); _quickGroup = quickInfoCard.GetComponent<CanvasGroup>();
         _canvasRect = GetComponent<RectTransform>();
         _canvas = GetComponent<Canvas>();
-        _screenMarkerPanelSprite = CreateRoundedPanelSprite();
     }
 
     void Start()
     {
         ConfigureQuickInfoCardLayout();
-        if (screenMarkerSelectedSprite == null)
-        {
-            screenMarkerSelectedSprite = iconBuilding;
-        }
-
-        if (screenMarkerDefaultSprite == null)
-        {
-            screenMarkerDefaultSprite = screenMarkerSelectedSprite;
-        }
-
         if (quickInfoTapTarget != null)
         {
             quickInfoTapTarget.onClick.AddListener(() => OnClickDetail?.Invoke());
@@ -208,7 +143,6 @@ public class ARUIManager : MonoBehaviour
             uiToolkitDetailPanel.OnClosed += HandleUIToolkitDetailClosed;
             uiToolkitDetailPanel.OnPhoneRequested += OnCallPhone;
             uiToolkitDetailPanel.OnCopyRequested += OnCopyAddress;
-            uiToolkitDetailPanel.OnShareRequested += OnShareDetail;
             uiToolkitDetailPanel.OnMapRequested += OnOpenMap;
         }
 
@@ -235,66 +169,15 @@ public class ARUIManager : MonoBehaviour
         if (navigationHUD != null) navigationHUD.SetActive(false);
         if (offScreenIndicator != null) offScreenIndicator.gameObject.SetActive(false);
 
-        EnsureScreenMarkerRoot();
         EnsureNavigationButton();
         EnsureWorldInfoDetailButton();
         InitializeQuickInfoCard(false);
-
-        EnsureScreenMarkerRoot();
         EnsureCenterReticle();
         SetPrimaryButtonsVisible(false);
     }
 
-    Sprite CreateRoundedPanelSprite()
-    {
-        const int textureSize = 128;
-        int radius = Mathf.Clamp(Mathf.RoundToInt(screenMarkerCornerRadius), 4, textureSize / 2 - 4);
-        const float edgeSoftness = 1.5f;
-        _screenMarkerPanelTexture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
-        _screenMarkerPanelTexture.name = "ScreenMarkerPanelTexture";
-        _screenMarkerPanelTexture.wrapMode = TextureWrapMode.Clamp;
-        _screenMarkerPanelTexture.filterMode = FilterMode.Bilinear;
-
-        Color32[] pixels = new Color32[textureSize * textureSize];
-        float halfSize = textureSize * 0.5f;
-        float innerHalfExtent = halfSize - radius;
-
-        for (int y = 0; y < textureSize; y++)
-        {
-            for (int x = 0; x < textureSize; x++)
-            {
-                float sampleX = (x + 0.5f) - halfSize;
-                float sampleY = (y + 0.5f) - halfSize;
-
-                float qx = Mathf.Abs(sampleX) - innerHalfExtent;
-                float qy = Mathf.Abs(sampleY) - innerHalfExtent;
-                float outsideX = Mathf.Max(qx, 0f);
-                float outsideY = Mathf.Max(qy, 0f);
-                float outsideDistance = Mathf.Sqrt((outsideX * outsideX) + (outsideY * outsideY));
-                float insideDistance = Mathf.Min(Mathf.Max(qx, qy), 0f);
-                float signedDistance = outsideDistance + insideDistance - radius;
-                float alpha = Mathf.Clamp01(0.5f - (signedDistance / edgeSoftness));
-
-                pixels[(y * textureSize) + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
-            }
-        }
-
-        _screenMarkerPanelTexture.SetPixels32(pixels);
-        _screenMarkerPanelTexture.Apply();
-
-        return Sprite.Create(
-            _screenMarkerPanelTexture,
-            new Rect(0f, 0f, textureSize, textureSize),
-            new Vector2(0.5f, 0.5f),
-            100f,
-            0u,
-            SpriteMeshType.FullRect,
-            new Vector4(radius, radius, radius, radius));
-    }
-
     void Update()
     {
-        UpdateScreenMarkerAnimations();
         UpdateCenterReticleAnimation();
     }
 
@@ -377,98 +260,6 @@ public class ARUIManager : MonoBehaviour
         {
             quickInfoTapTarget.gameObject.SetActive(visible);
         }
-    }
-
-    public void UpdateScreenMarkers(List<ScreenMarkerData> markerDataList)
-    {
-        EnsureScreenMarkerRoot();
-
-        HashSet<string> activeIds = new HashSet<string>();
-        foreach (ScreenMarkerData data in markerDataList)
-        {
-            if (data == null || string.IsNullOrWhiteSpace(data.id)) continue;
-
-            activeIds.Add(data.id);
-            ScreenMarkerView view = GetOrCreateScreenMarkerView(data.id);
-            view.root.SetActive(true);
-            view.rectTransform.anchoredPosition = ClampToCanvas(data.screenPosition);
-            float pinSize = (data.isSelected ? 72f : 60f) * GetScreenMarkerDistanceScale(data.distanceMeters);
-            if (view.pinRect != null)
-            {
-                view.pinRect.sizeDelta = new Vector2(pinSize, pinSize);
-            }
-            if (view.pinShadowRect != null)
-            {
-                float shadowSize = pinSize + (10f * GetScreenMarkerDistanceScale(data.distanceMeters));
-                view.pinShadowRect.sizeDelta = new Vector2(shadowSize, shadowSize);
-            }
-            if (view.pinShadowImage != null)
-            {
-                view.pinShadowImage.color = data.isSelected
-                    ? new Color(0f, 0f, 0f, 0.28f)
-                    : new Color(0f, 0f, 0f, 0.2f);
-            }
-            if (view.pinImage != null)
-            {
-                view.pinImage.sprite = data.isSelected ? screenMarkerSelectedSprite : screenMarkerDefaultSprite;
-                view.pinImage.color = data.isSelected
-                    ? new Color(1f, 1f, 1f, 1f)
-                    : new Color(1f, 1f, 1f, 0.96f);
-            }
-            view.isSelectedTarget = data.isSelected;
-            if (view.titleText != null) view.titleText.text = data.label;
-            if (view.categoryText != null) view.categoryText.text = string.IsNullOrWhiteSpace(data.category) ? "건물 정보" : data.category;
-            if (view.addressText != null) view.addressText.text = string.IsNullOrWhiteSpace(data.address) ? "주소 정보 없음" : data.address;
-            if (view.bubbleIcon != null) view.bubbleIcon.sprite = iconBuilding;
-            if (view.bubbleButton != null) view.bubbleButton.interactable = data.isSelected;
-            UpdateScreenMarkerBubbleLayout(view);
-        }
-
-        foreach (var pair in _screenMarkerViews)
-        {
-            if (pair.Value?.root != null)
-            {
-                pair.Value.root.SetActive(activeIds.Contains(pair.Key));
-            }
-        }
-    }
-
-    float GetScreenMarkerDistanceScale(float distanceMeters)
-    {
-        if (distanceMeters <= 0f)
-        {
-            return 1f;
-        }
-
-        float nearDistance = Mathf.Max(0.01f, screenMarkerScaleNearDistance);
-        float farDistance = Mathf.Max(nearDistance + 0.01f, screenMarkerScaleFarDistance);
-        float t = Mathf.InverseLerp(nearDistance, farDistance, distanceMeters);
-        return Mathf.Lerp(screenMarkerScaleNearMultiplier, screenMarkerScaleFarMultiplier, t);
-    }
-
-    public void ClearScreenMarkers()
-    {
-        foreach (var pair in _screenMarkerViews)
-        {
-            if (pair.Value?.root != null)
-            {
-                pair.Value.root.SetActive(false);
-            }
-        }
-    }
-
-    void EnsureScreenMarkerRoot()
-    {
-        if (_screenMarkerRoot != null) return;
-
-        GameObject rootObject = new GameObject("ScreenMarkerRoot", typeof(RectTransform));
-        rootObject.transform.SetParent(transform, false);
-        _screenMarkerRoot = rootObject.GetComponent<RectTransform>();
-        _screenMarkerRoot.anchorMin = Vector2.zero;
-        _screenMarkerRoot.anchorMax = Vector2.one;
-        _screenMarkerRoot.offsetMin = Vector2.zero;
-        _screenMarkerRoot.offsetMax = Vector2.zero;
-        _screenMarkerRoot.SetAsLastSibling();
     }
 
     void EnsureCenterReticle()
@@ -694,546 +485,6 @@ public class ARUIManager : MonoBehaviour
         }
     }
 
-    ScreenMarkerView GetOrCreateScreenMarkerView(string id)
-    {
-        if (_screenMarkerViews.TryGetValue(id, out ScreenMarkerView existingView) && existingView?.root != null)
-        {
-            return existingView;
-        }
-
-        GameObject rootObject = new GameObject($"ScreenMarker_{id}", typeof(RectTransform));
-        rootObject.transform.SetParent(_screenMarkerRoot, false);
-
-        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
-        rootRect.anchorMin = new Vector2(0.5f, 0.5f);
-        rootRect.anchorMax = new Vector2(0.5f, 0.5f);
-        rootRect.pivot = new Vector2(0.5f, 0.5f);
-        rootRect.sizeDelta = new Vector2(680f, 360f);
-
-        Image pinShadowImage = CreateScreenMarkerImage("PinShadow", rootObject.transform, 5f, -3f, 70f, 70f);
-        Image pinImage = CreateScreenMarkerImage("Pin", rootObject.transform, 0f, 0f, 60f, 60f);
-        Vector2 pinShadowHiddenPosition = new Vector2(5f, -3f);
-        Vector2 pinShadowShownPosition = new Vector2(2f, 10f);
-        Vector2 pinHiddenPosition = new Vector2(0f, 0f);
-        Vector2 pinShownPosition = new Vector2(0f, 12f);
-        if (pinShadowImage != null)
-        {
-            pinShadowImage.color = new Color(0f, 0f, 0f, 0.2f);
-        }
-        if (pinImage != null)
-        {
-            pinImage.color = new Color(1f, 1f, 1f, 0.96f);
-        }
-
-        Vector2 bubbleHiddenPosition = new Vector2(0f, 6f);
-        Vector2 bubbleShownPosition = new Vector2(0f, 42f);
-
-        GameObject bubbleShadowObject = new GameObject("BubbleShadow", typeof(RectTransform), typeof(Image));
-        bubbleShadowObject.transform.SetParent(rootObject.transform, false);
-
-        RectTransform bubbleShadowRect = bubbleShadowObject.GetComponent<RectTransform>();
-        bubbleShadowRect.anchorMin = new Vector2(0.5f, 0.5f);
-        bubbleShadowRect.anchorMax = new Vector2(0.5f, 0.5f);
-        bubbleShadowRect.pivot = new Vector2(0.5f, 0f);
-        bubbleShadowRect.anchoredPosition = bubbleHiddenPosition + screenMarkerShadowOffset;
-        bubbleShadowRect.sizeDelta = new Vector2(230f, 114f);
-
-        Image bubbleShadow = bubbleShadowObject.GetComponent<Image>();
-        bubbleShadow.sprite = _screenMarkerPanelSprite;
-        bubbleShadow.type = Image.Type.Sliced;
-        bubbleShadow.color = screenMarkerShadowColor;
-        bubbleShadow.raycastTarget = false;
-
-        GameObject bubbleObject = new GameObject("Bubble", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Button));
-        bubbleObject.transform.SetParent(rootObject.transform, false);
-
-        RectTransform bubbleRect = bubbleObject.GetComponent<RectTransform>();
-        bubbleRect.anchorMin = new Vector2(0.5f, 0.5f);
-        bubbleRect.anchorMax = new Vector2(0.5f, 0.5f);
-        bubbleRect.pivot = new Vector2(0.5f, 0f);
-        bubbleRect.anchoredPosition = bubbleHiddenPosition;
-        bubbleRect.sizeDelta = new Vector2(220f, 104f);
-
-        Image bubbleBackground = bubbleObject.GetComponent<Image>();
-        bubbleBackground.sprite = _screenMarkerPanelSprite;
-        bubbleBackground.type = Image.Type.Sliced;
-        bubbleBackground.color = new Color(1f, 1f, 1f, 0.82f);
-        bubbleBackground.raycastTarget = true;
-
-        CanvasGroup bubbleGroup = bubbleObject.GetComponent<CanvasGroup>();
-        bubbleGroup.alpha = 0f;
-        bubbleGroup.blocksRaycasts = false;
-        bubbleGroup.interactable = false;
-        bubbleObject.transform.localScale = new Vector3(0.2f, 0.12f, 1f);
-
-        Button bubbleButton = bubbleObject.GetComponent<Button>();
-        bubbleButton.transition = Selectable.Transition.None;
-        bubbleButton.interactable = false;
-        bubbleButton.onClick.AddListener(() => OnClickDetail?.Invoke());
-
-        RectTransform bubbleIconRect = CreateRectTransformChild(
-            "BubbleIcon",
-            bubbleObject.transform,
-            new Vector2(18f, -16f),
-            new Vector2(24f, 24f),
-            new Vector2(0f, 1f),
-            new Vector2(0f, 1f),
-            new Vector2(0f, 1f));
-        Image bubbleIcon = bubbleIconRect.gameObject.AddComponent<Image>();
-        bubbleIcon.sprite = iconBuilding;
-        bubbleIcon.preserveAspect = true;
-        bubbleIcon.raycastTarget = false;
-
-        TextMeshProUGUI titleText = CreateScreenMarkerText("Title", bubbleObject.transform, 0f, 0f, 180f, 24f, TextAlignmentOptions.TopLeft);
-        TextMeshProUGUI categoryText = CreateScreenMarkerText("Category", bubbleObject.transform, 0f, 0f, 180f, 20f, TextAlignmentOptions.MidlineLeft);
-        TextMeshProUGUI addressText = CreateScreenMarkerText("Address", bubbleObject.transform, 0f, 0f, 72f, 20f, TextAlignmentOptions.MidlineRight);
-        ConfigureBubbleText(titleText, 17f, FontStyles.Bold, new Color(0.06f, 0.07f, 0.1f, 1f), TextWrappingModes.NoWrap, TextOverflowModes.Overflow);
-        titleText.overflowMode = TextOverflowModes.Overflow;
-        ConfigureBubbleText(categoryText, 12f, FontStyles.Normal, new Color(0.28f, 0.33f, 0.41f, 1f), TextWrappingModes.NoWrap, TextOverflowModes.Ellipsis);
-        ConfigureBubbleText(addressText, 12f, FontStyles.Bold, new Color(0.18f, 0.22f, 0.28f, 0.95f), TextWrappingModes.NoWrap, TextOverflowModes.Ellipsis);
-
-        ScreenMarkerView view = new ScreenMarkerView
-        {
-            root = rootObject,
-            rectTransform = rootRect,
-            pinShadowImage = pinShadowImage,
-            pinShadowRect = pinShadowImage != null ? pinShadowImage.rectTransform : null,
-            pinShadowHiddenPosition = pinShadowHiddenPosition,
-            pinShadowShownPosition = pinShadowShownPosition,
-            pinImage = pinImage,
-            pinRect = pinImage != null ? pinImage.rectTransform : null,
-            pinHiddenPosition = pinHiddenPosition,
-            pinShownPosition = pinShownPosition,
-            bubbleBackground = bubbleBackground,
-            bubbleShadow = bubbleShadow,
-            bubbleShadowRect = bubbleShadowRect,
-            bubbleRect = bubbleRect,
-            bubbleGroup = bubbleGroup,
-            bubbleHiddenPosition = bubbleHiddenPosition,
-            bubbleShownPosition = bubbleShownPosition,
-            bubbleIcon = bubbleIcon,
-            titleText = titleText,
-            categoryText = categoryText,
-            addressText = addressText,
-            bubbleButton = bubbleButton,
-            isSelectedTarget = false,
-            selectionLerp = 0f
-        };
-
-        UpdateScreenMarkerBubbleLayout(view);
-        _screenMarkerViews[id] = view;
-        return view;
-    }
-
-    TextMeshProUGUI CreateScreenMarkerText(string name, Transform parent, float posX, float posY, float width, float height, TextAlignmentOptions alignment)
-    {
-        GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(parent, false);
-
-        RectTransform rect = textObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(posX, posY);
-        rect.sizeDelta = new Vector2(width, height);
-
-        TextMeshProUGUI tmp = textObject.GetComponent<TextMeshProUGUI>();
-        tmp.alignment = alignment;
-        tmp.raycastTarget = false;
-        tmp.fontStyle = FontStyles.Bold;
-        TMP_FontAsset fallbackFont = null;
-        Material fallbackMaterial = null;
-        if (quickBuildingNameText != null)
-        {
-            fallbackFont = quickBuildingNameText.font;
-            fallbackMaterial = quickBuildingNameText.fontSharedMaterial;
-        }
-        else if (quickCategoryText != null)
-        {
-            fallbackFont = quickCategoryText.font;
-            fallbackMaterial = quickCategoryText.fontSharedMaterial;
-        }
-        else if (TMP_Settings.instance != null && TMP_Settings.defaultFontAsset != null)
-        {
-            fallbackFont = TMP_Settings.defaultFontAsset;
-        }
-
-        if (fallbackFont != null)
-        {
-            tmp.font = fallbackFont;
-        }
-
-        if (fallbackMaterial != null)
-        {
-            tmp.fontSharedMaterial = fallbackMaterial;
-        }
-        return tmp;
-    }
-
-    RectTransform CreateRectTransformChild(string name, Transform parent, Vector2 anchoredPosition, Vector2 size, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot)
-    {
-        GameObject child = new GameObject(name, typeof(RectTransform));
-        child.transform.SetParent(parent, false);
-
-        RectTransform rect = child.GetComponent<RectTransform>();
-        rect.anchorMin = anchorMin;
-        rect.anchorMax = anchorMax;
-        rect.pivot = pivot;
-        rect.anchoredPosition = anchoredPosition;
-        rect.sizeDelta = size;
-        return rect;
-    }
-
-    void ConfigureBubbleText(TextMeshProUGUI text, float fontSize, FontStyles fontStyle, Color color, TextWrappingModes wrappingMode, TextOverflowModes overflowMode)
-    {
-        if (text == null) return;
-
-        text.fontSize = fontSize;
-        text.fontStyle = fontStyle;
-        text.color = color;
-        text.textWrappingMode = wrappingMode;
-        text.overflowMode = overflowMode;
-        text.raycastTarget = false;
-    }
-
-    string WrapTextByWordBoundary(TextMeshProUGUI text, string value, float maxWidth)
-    {
-        if (text == null || string.IsNullOrWhiteSpace(value) || maxWidth <= 0f)
-        {
-            return value ?? string.Empty;
-        }
-
-        string normalized = value.Replace("\r\n", "\n");
-        string[] paragraphs = normalized.Split('\n');
-        List<string> wrappedLines = new List<string>();
-
-        foreach (string paragraph in paragraphs)
-        {
-            if (string.IsNullOrWhiteSpace(paragraph))
-            {
-                wrappedLines.Add(string.Empty);
-                continue;
-            }
-
-            string[] words = paragraph.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length == 0)
-            {
-                wrappedLines.Add(string.Empty);
-                continue;
-            }
-
-            string currentLine = words[0];
-            for (int i = 1; i < words.Length; i++)
-            {
-                string candidateLine = $"{currentLine} {words[i]}";
-                float singleLineWidth = text.GetPreferredValues(candidateLine, 0f, 0f).x;
-                if (singleLineWidth <= maxWidth)
-                {
-                    currentLine = candidateLine;
-                    continue;
-                }
-
-                wrappedLines.Add(currentLine);
-                currentLine = words[i];
-            }
-
-            wrappedLines.Add(currentLine);
-        }
-
-        return string.Join("\n", wrappedLines);
-    }
-
-    float GetWrappedTextMaxLineWidth(TextMeshProUGUI text, string wrappedValue)
-    {
-        if (text == null || string.IsNullOrEmpty(wrappedValue))
-        {
-            return 0f;
-        }
-
-        string[] lines = wrappedValue.Split('\n');
-        float maxLineWidth = 0f;
-        foreach (string line in lines)
-        {
-            maxLineWidth = Mathf.Max(maxLineWidth, text.GetPreferredValues(line, 0f, 0f).x);
-        }
-
-        return maxLineWidth;
-    }
-
-    float GetRenderedTextHeight(TextMeshProUGUI text, string value, float width, float fallbackMinHeight)
-    {
-        if (text == null)
-        {
-            return fallbackMinHeight;
-        }
-
-        RectTransform rect = text.rectTransform;
-        Vector2 previousSize = rect.sizeDelta;
-        string previousText = text.text;
-
-        rect.sizeDelta = new Vector2(width, Mathf.Max(previousSize.y, fallbackMinHeight));
-        if (text.text != value)
-        {
-            text.text = value;
-        }
-
-        text.ForceMeshUpdate();
-        float renderedHeight = Mathf.Max(fallbackMinHeight, text.preferredHeight);
-
-        rect.sizeDelta = previousSize;
-        if (text.text != previousText)
-        {
-            text.text = previousText;
-            text.ForceMeshUpdate();
-        }
-
-        return renderedHeight;
-    }
-
-    Image CreateScreenMarkerImage(string name, Transform parent, float posX, float posY, float width, float height)
-    {
-        GameObject imageObject = new GameObject(name, typeof(RectTransform), typeof(Image));
-        imageObject.transform.SetParent(parent, false);
-
-        RectTransform rect = imageObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(posX, posY);
-        rect.sizeDelta = new Vector2(width, height);
-
-        Image image = imageObject.GetComponent<Image>();
-        image.sprite = screenMarkerDefaultSprite != null ? screenMarkerDefaultSprite : screenMarkerSelectedSprite;
-        image.preserveAspect = true;
-        image.raycastTarget = false;
-        return image;
-    }
-
-    Image CreateScreenMarkerBackground(Transform parent, float posX, float posY, float width, float height)
-    {
-        GameObject backgroundObject = new GameObject("LabelBackground", typeof(RectTransform), typeof(Image));
-        backgroundObject.transform.SetParent(parent, false);
-
-        RectTransform rect = backgroundObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(posX, posY);
-        rect.sizeDelta = new Vector2(width, height);
-
-        Image image = backgroundObject.GetComponent<Image>();
-        image.color = new Color(0.06f, 0.08f, 0.12f, 0.78f);
-        image.raycastTarget = false;
-        return image;
-    }
-
-    void UpdateScreenMarkerBubbleLayout(ScreenMarkerView view)
-    {
-        if (view == null || view.bubbleRect == null || view.titleText == null || view.categoryText == null || view.addressText == null)
-        {
-            return;
-        }
-
-        const float leftPadding = 24f;
-        const float rightPadding = 28f;
-        const float topPadding = 22f;
-        const float iconSize = 26f;
-        const float iconGap = 12f;
-        const float innerGap = 4f;
-        const float distanceGap = 16f;
-        const float bubbleMinWidth = 220f;
-        const float bubbleMinHeight = 70f;
-
-        float bubbleMaxWidth = 420f;
-        if (_canvasRect != null)
-        {
-            bubbleMaxWidth = Mathf.Clamp(_canvasRect.rect.width - 96f, 320f, 620f);
-        }
-
-        bool hasCategory = !string.IsNullOrWhiteSpace(view.categoryText.text);
-        bool hasDistance = !string.IsNullOrWhiteSpace(view.addressText.text);
-        string rawTitle = view.titleText.text ?? string.Empty;
-
-        float maxDistanceWidth = 88f;
-        float distancePreferredWidth = hasDistance
-            ? view.addressText.GetPreferredValues(view.addressText.text, maxDistanceWidth, 0f).x
-            : 0f;
-        float distanceColumnWidth = hasDistance
-            ? Mathf.Clamp(distancePreferredWidth, 52f, maxDistanceWidth)
-            : 0f;
-        float distanceSectionWidth = hasDistance ? distanceGap + distanceColumnWidth : 0f;
-
-        float textMaxWidth = bubbleMaxWidth - leftPadding - rightPadding - iconSize - iconGap - distanceSectionWidth;
-        float actualMiddleWidth = Mathf.Max(96f, textMaxWidth);
-
-        string wrappedTitle = WrapTextByWordBoundary(view.titleText, rawTitle, actualMiddleWidth);
-        if (view.titleText.text != wrappedTitle)
-        {
-            view.titleText.text = wrappedTitle;
-        }
-
-        float titleWidth = Mathf.Min(actualMiddleWidth, GetWrappedTextMaxLineWidth(view.titleText, wrappedTitle));
-        float categoryWidth = hasCategory
-            ? Mathf.Min(actualMiddleWidth, view.categoryText.GetPreferredValues(view.categoryText.text, 0f, 0f).x)
-            : 0f;
-        float middleColumnWidth = Mathf.Clamp(Mathf.Max(titleWidth, categoryWidth, 96f), 96f, textMaxWidth);
-        float bubbleWidth = Mathf.Clamp(
-            leftPadding + iconSize + iconGap + middleColumnWidth + distanceSectionWidth + rightPadding,
-            bubbleMinWidth,
-            bubbleMaxWidth);
-        actualMiddleWidth = bubbleWidth - leftPadding - rightPadding - iconSize - iconGap - distanceSectionWidth;
-
-        wrappedTitle = WrapTextByWordBoundary(view.titleText, rawTitle, actualMiddleWidth);
-        if (view.titleText.text != wrappedTitle)
-        {
-            view.titleText.text = wrappedTitle;
-        }
-
-        float titleHeight = GetRenderedTextHeight(view.titleText, wrappedTitle, actualMiddleWidth, 20f);
-        float categoryHeight = hasCategory
-            ? GetRenderedTextHeight(view.categoryText, view.categoryText.text, actualMiddleWidth, 16f)
-            : 0f;
-        float distanceHeight = hasDistance
-            ? GetRenderedTextHeight(view.addressText, view.addressText.text, distanceColumnWidth, 18f)
-            : 0f;
-
-        float middleColumnHeight = titleHeight;
-        if (hasCategory)
-        {
-            middleColumnHeight += innerGap + categoryHeight;
-        }
-
-        float contentHeight = Mathf.Max(iconSize, Mathf.Max(middleColumnHeight, distanceHeight));
-        float bubbleHeight = Mathf.Max(bubbleMinHeight, (topPadding * 2f) + contentHeight);
-        float verticalInset = (bubbleHeight - contentHeight) * 0.5f;
-
-        view.bubbleRect.sizeDelta = new Vector2(bubbleWidth, bubbleHeight);
-        if (view.bubbleShadowRect != null)
-        {
-            view.bubbleShadowRect.sizeDelta = new Vector2(
-                bubbleWidth + screenMarkerShadowExpansion,
-                bubbleHeight + screenMarkerShadowExpansion);
-        }
-
-        RectTransform iconRect = view.bubbleIcon.rectTransform;
-        iconRect.anchorMin = new Vector2(0f, 1f);
-        iconRect.anchorMax = new Vector2(0f, 1f);
-        iconRect.pivot = new Vector2(0f, 1f);
-        iconRect.anchoredPosition = new Vector2(leftPadding, -verticalInset - Mathf.Max(0f, (contentHeight - iconSize) * 0.5f));
-        iconRect.sizeDelta = new Vector2(iconSize, iconSize);
-
-        float textStartX = leftPadding + iconSize + iconGap;
-        float textStartY = verticalInset + Mathf.Max(0f, (contentHeight - middleColumnHeight) * 0.5f);
-
-        RectTransform titleRect = view.titleText.rectTransform;
-        titleRect.anchorMin = new Vector2(0f, 1f);
-        titleRect.anchorMax = new Vector2(0f, 1f);
-        titleRect.pivot = new Vector2(0f, 1f);
-        titleRect.anchoredPosition = new Vector2(textStartX, -textStartY);
-        titleRect.sizeDelta = new Vector2(actualMiddleWidth, titleHeight);
-
-        RectTransform categoryRect = view.categoryText.rectTransform;
-        categoryRect.anchorMin = new Vector2(0f, 1f);
-        categoryRect.anchorMax = new Vector2(0f, 1f);
-        categoryRect.pivot = new Vector2(0f, 1f);
-        categoryRect.anchoredPosition = new Vector2(textStartX, -textStartY - titleHeight - (hasCategory ? innerGap : 0f));
-        categoryRect.sizeDelta = new Vector2(actualMiddleWidth, categoryHeight);
-        view.categoryText.gameObject.SetActive(hasCategory);
-
-        RectTransform addressRect = view.addressText.rectTransform;
-        addressRect.anchorMin = new Vector2(1f, 1f);
-        addressRect.anchorMax = new Vector2(1f, 1f);
-        addressRect.pivot = new Vector2(1f, 0.5f);
-        addressRect.anchoredPosition = new Vector2(-rightPadding, -(bubbleHeight * 0.5f));
-        addressRect.sizeDelta = new Vector2(distanceColumnWidth, distanceHeight);
-        view.addressText.gameObject.SetActive(hasDistance);
-    }
-
-    void UpdateScreenMarkerAnimations()
-    {
-        if (_screenMarkerViews.Count == 0)
-        {
-            return;
-        }
-
-        float step = animDuration <= 0f ? 1f : Time.deltaTime / animDuration;
-        foreach (ScreenMarkerView view in _screenMarkerViews.Values)
-        {
-            if (view == null || view.root == null || !view.root.activeSelf)
-            {
-                continue;
-            }
-
-            float target = view.isSelectedTarget ? 1f : 0f;
-            view.selectionLerp = Mathf.MoveTowards(view.selectionLerp, target, step);
-            float t = view.selectionLerp * view.selectionLerp * (3f - 2f * view.selectionLerp);
-
-            if (view.pinRect != null)
-            {
-                view.pinRect.localScale = Vector3.Lerp(Vector3.one, new Vector3(0.78f, 0.78f, 1f), t);
-                view.pinRect.anchoredPosition = Vector2.Lerp(view.pinHiddenPosition, view.pinShownPosition, t);
-            }
-
-            if (view.pinImage != null)
-            {
-                Color c = view.pinImage.color;
-                c.a = Mathf.Lerp(1f, 0f, t);
-                view.pinImage.color = c;
-            }
-
-            if (view.pinShadowImage != null)
-            {
-                Color c = view.pinShadowImage.color;
-                c.a = Mathf.Lerp(0.2f, 0.05f, t);
-                view.pinShadowImage.color = c;
-            }
-
-            if (view.pinShadowRect != null)
-            {
-                view.pinShadowRect.anchoredPosition = Vector2.Lerp(view.pinShadowHiddenPosition, view.pinShadowShownPosition, t);
-                view.pinShadowRect.localScale = Vector3.Lerp(Vector3.one, new Vector3(0.82f, 0.82f, 1f), t);
-            }
-
-            if (view.bubbleGroup != null)
-            {
-                view.bubbleGroup.alpha = t;
-                view.bubbleGroup.blocksRaycasts = t > 0.95f;
-                view.bubbleGroup.interactable = t > 0.95f;
-            }
-
-            if (view.bubbleRect != null)
-            {
-                view.bubbleRect.localScale = Vector3.Lerp(new Vector3(0.2f, 0.12f, 1f), Vector3.one, t);
-                view.bubbleRect.anchoredPosition = Vector2.Lerp(view.bubbleHiddenPosition, view.bubbleShownPosition, t);
-            }
-
-            if (view.bubbleShadowRect != null)
-            {
-                view.bubbleShadowRect.localScale = Vector3.Lerp(new Vector3(0.2f, 0.12f, 1f), Vector3.one, t);
-                view.bubbleShadowRect.anchoredPosition = Vector2.Lerp(
-                    view.bubbleHiddenPosition + screenMarkerShadowOffset,
-                    view.bubbleShownPosition + screenMarkerShadowOffset,
-                    t);
-            }
-        }
-    }
-
-    Vector2 ClampToCanvas(Vector2 screenPosition)
-    {
-        Vector2 localPoint;
-        Camera uiCamera = _canvas != null && _canvas.renderMode != RenderMode.ScreenSpaceOverlay ? _canvas.worldCamera : null;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screenPosition, uiCamera, out localPoint);
-
-        const float paddingX = 180f;
-        const float paddingY = 180f;
-        float halfWidth = _canvasRect.rect.width * 0.5f;
-        float halfHeight = _canvasRect.rect.height * 0.5f;
-
-        localPoint.x = Mathf.Clamp(localPoint.x, -halfWidth + paddingX, halfWidth - paddingX);
-        localPoint.y = Mathf.Clamp(localPoint.y, -halfHeight + 96f, halfHeight - paddingY);
-        return localPoint;
-    }
-
     void ConfigureQuickInfoCardLayout()
     {
         if (_quickRect == null)
@@ -1364,8 +615,6 @@ public class ARUIManager : MonoBehaviour
 
         _currentDetailData = data;
         uiToolkitDetailPanel.Show(data);
-        ClearScreenMarkers();
-        ToggleScreenMarkerOverlay(false);
         OnDetailOpened?.Invoke();
     }
 
@@ -1379,16 +628,9 @@ public class ARUIManager : MonoBehaviour
 
     void HandleUIToolkitDetailClosed()
     {
-        ToggleScreenMarkerOverlay(true);
         OnDetailClosed?.Invoke();
     }
     #endregion
-
-    void ToggleScreenMarkerOverlay(bool visible)
-    {
-        if (_screenMarkerRoot == null) return;
-        _screenMarkerRoot.gameObject.SetActive(visible);
-    }
 
     #region UI Utilities (Toast & Buttons)
     // 토스트 메시지 표시
@@ -1433,32 +675,6 @@ public class ARUIManager : MonoBehaviour
             GUIUtility.systemCopyBuffer = _currentDetailData.fetchedAddress;
             ShowToast("주소가 복사되었습니다.");
         }
-    }
-
-    void OnShareDetail()
-    {
-        if (_currentDetailData == null)
-        {
-            return;
-        }
-
-        List<string> parts = new List<string>();
-        string selectedPlaceName = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceName : string.Empty;
-        string selectedPlaceUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : string.Empty;
-
-        if (!string.IsNullOrEmpty(_currentDetailData.buildingName)) parts.Add(_currentDetailData.buildingName);
-        if (!string.IsNullOrEmpty(selectedPlaceName) && selectedPlaceName != _currentDetailData.buildingName) parts.Add(selectedPlaceName);
-        if (!string.IsNullOrEmpty(_currentDetailData.fetchedAddress)) parts.Add(_currentDetailData.fetchedAddress);
-        if (!string.IsNullOrEmpty(selectedPlaceUrl)) parts.Add(selectedPlaceUrl);
-        else if (!string.IsNullOrEmpty(_currentDetailData.placeUrl)) parts.Add(_currentDetailData.placeUrl);
-
-        if (parts.Count == 0)
-        {
-            return;
-        }
-
-        GUIUtility.systemCopyBuffer = string.Join("\n", parts);
-        ShowToast("건물 정보가 복사되었습니다.");
     }
 
     void OnCallPhone()
@@ -2427,7 +1643,6 @@ public class ARUIManager : MonoBehaviour
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
         HideCard(quickInfoCard, _quickRect, _quickGroup, ref _quickRoutine);
         SetPrimaryButtonsVisible(false);
-        ClearScreenMarkers();
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
     }

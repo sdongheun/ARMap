@@ -53,11 +53,12 @@ MonoBehaviour:
   titleFontSize: 8.7
   subtitleFontSize: 4.8
   buttonPlateSize: {x: 10.8, y: 4.5}
+  labelBackgroundTexture: {fileID: 2800000, guid: 73d6876f3935143c1850fe4a1966a8c5, type: 3}
   fontAssetOverride: {fileID: 11400000, guid: 3b7e3d9f269684160abccdb03da8a646, type: 2}
   fontMaterialOverride: {fileID: 0}
   hiddenColor: {r: 1, g: 1, b: 1, a: 0}
-  previewColor: {r: 0.08, g: 0.95, b: 1, a: 1}
-  activeColor: {r: 1, g: 0.25, b: 0.1, a: 1}
+  previewColor: {r: 0.96, g: 0.24, b: 0.24, a: 0.96}
+  activeColor: {r: 0.88, g: 0.12, b: 0.12, a: 1}
   infoLabelOffset: {x: 0, y: 1.5, z: 0}
   infoLabelCanvasSize: {x: 260, y: 92}
   infoLabelTextPadding: {x: 20, y: 14}

@@ -16,7 +16,6 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     public event Action OnClosed;
     public event Action OnPhoneRequested;
     public event Action OnCopyRequested;
-    public event Action OnShareRequested;
     public event Action OnMapRequested;
 
     public bool IsVisible => _isVisible;
@@ -28,17 +27,6 @@ public class ARDetailPanelDocumentController : MonoBehaviour
             return option != null
                 ? (option.name ?? string.Empty)
                 : (_currentData?.buildingName ?? string.Empty);
-        }
-    }
-
-    public string CurrentDisplayedCategory
-    {
-        get
-        {
-            DetailPlaceOption option = GetCurrentPlaceOption();
-            return option != null
-                ? (option.category ?? string.Empty)
-                : (_currentData?.description ?? string.Empty);
         }
     }
 

@@ -17,15 +17,16 @@ public class BuildingMarker : MonoBehaviour
     public float activeScale = 0.54f;
     public float animSpeed = 8.0f;
     public float labelHeight = 1.4f;
-    public float previewDotSize = 1.2f;
+    public float previewDotSize = 3f;
     public float titleFontSize = 8.7f;
     public float subtitleFontSize = 4.8f;
     public Vector2 buttonPlateSize = new Vector2(10.8f, 4.5f);
+    public Texture2D labelBackgroundTexture;
     public TMP_FontAsset fontAssetOverride;
     public Material fontMaterialOverride;
     public Color hiddenColor = new Color(1f, 1f, 1f, 0f);
-    public Color previewColor = new Color(0.95f, 0.98f, 1f, 0.96f);
-    public Color activeColor = new Color(1.0f, 0.92f, 0.25f, 1.0f);
+    public Color previewColor = new Color(0.96f, 0.24f, 0.24f, 0.96f);
+    public Color activeColor = new Color(0.88f, 0.12f, 0.12f, 1.0f);
 
     private Transform _visualRoot;
     private Transform _dotRoot;
@@ -107,7 +108,7 @@ public class BuildingMarker : MonoBehaviour
 
         CreateDotVisual();
         CreateButtonPlate(_visualRoot);
-        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 0.28f, 0f), titleFontSize, FontStyles.Bold);
+        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 0.7f, 0f), titleFontSize, FontStyles.Bold);
         _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, -0.18f, 0f), subtitleFontSize, FontStyles.Normal);
         EnsureHitCollider();
     }
@@ -152,12 +153,12 @@ public class BuildingMarker : MonoBehaviour
 
     void CreateButtonPlate(Transform parent)
     {
-        GameObject plateObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject plateObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plateObject.name = "ButtonPlate";
         plateObject.transform.SetParent(parent, false);
-        plateObject.transform.localPosition = new Vector3(0f, 0.03f, 0.08f);
+        plateObject.transform.localPosition = new Vector3(0f, 0.03f, 0.06f);
         plateObject.transform.localRotation = Quaternion.identity;
-        plateObject.transform.localScale = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 0.08f);
+        plateObject.transform.localScale = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 1f);
 
         Collider plateCollider = plateObject.GetComponent<Collider>();
         if (plateCollider != null)
@@ -168,7 +169,7 @@ public class BuildingMarker : MonoBehaviour
         _buttonPlateRenderer = plateObject.GetComponent<Renderer>();
         if (_buttonPlateRenderer != null)
         {
-            Shader shader = Shader.Find("Unlit/Color");
+            Shader shader = Shader.Find("Unlit/Transparent");
             if (shader == null)
             {
                 shader = Shader.Find("Sprites/Default");
@@ -177,6 +178,10 @@ public class BuildingMarker : MonoBehaviour
             if (shader != null)
             {
                 _buttonPlateMaterial = new Material(shader);
+                if (labelBackgroundTexture != null)
+                {
+                    _buttonPlateMaterial.mainTexture = labelBackgroundTexture;
+                }
                 _buttonPlateRenderer.material = _buttonPlateMaterial;
             }
 
@@ -290,8 +295,8 @@ public class BuildingMarker : MonoBehaviour
 
         if (_buttonPlateMaterial != null)
         {
-            float panelAlpha = Mathf.Clamp01(color.a * 0.78f);
-            _buttonPlateMaterial.color = new Color(0.06f, 0.09f, 0.14f, panelAlpha);
+            float panelAlpha = Mathf.Clamp01(color.a * 0.96f);
+            _buttonPlateMaterial.color = new Color(1f, 1f, 1f, panelAlpha);
         }
     }
 

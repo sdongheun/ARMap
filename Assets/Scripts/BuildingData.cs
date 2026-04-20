@@ -16,14 +16,10 @@ public class BuildingData
     public string buildingName;
     public string description; // 카테고리
     public string fetchedAddress; 
-    
-    // ★ 전화, 지도, 우편번호)
+
+    // ★ 전화, 지도
     public string phoneNumber; 
     public string placeUrl;    
-    public string zipCode;     
-    public string openingHours;
-    public string photoUrl;
-    public string secondaryPhotoUrl;
 
     // ★ 입점 상가 리스트 
     public List<FacilityInfo> facilities = new List<FacilityInfo>(); 
