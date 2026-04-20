@@ -5,7 +5,6 @@ using Google.XR.ARCoreExtensions;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using UnityEngine.Networking;
-using UnityEngine.EventSystems;
 using System.Linq;
 using System;
 using System.IO;
@@ -31,8 +30,6 @@ public class GeospatialManager : MonoBehaviour
     {
         public string kakaoRestApiKey;
         public string tmapApiKey;
-        public string androidCloudServicesApiKey;
-        public string iosCloudServicesApiKey;
     }
 
     private class SearchDiagnostics
@@ -123,9 +120,6 @@ public class GeospatialManager : MonoBehaviour
     public int maxPreviewAnchors = 3;       // 동시에 보여줄 최대 앵커 수
     public float anchorCreationRadius = 150.0f; // 현재 위치 기준 실제 생성 반경
     public int maxWorldTextMarkers = 20; // 후보로 유지할 최대 건물 수
-    public int anchorCreateYieldInterval = 1; // 앵커 몇 개마다 한 프레임 양보할지
-    public int textCreateYieldInterval = 1; // 텍스트 몇 개마다 한 프레임 양보할지
-    public float selectedAnchorCreateDelay = 0.05f; // 같은 건물을 잠시 바라봤을 때만 앵커 생성
     public bool enableWorldTextMarker = true; // 원인 분리용: 텍스트 마커 생성/표시 토글
     public MarkerRenderMode markerRenderMode = MarkerRenderMode.World3D; // 2D/3D 마커 렌더 방식
     public double markerAltitudeOffsetMeters = 1.0; // 지면 고도 기준 앵커 오프셋
@@ -141,21 +135,6 @@ public class GeospatialManager : MonoBehaviour
     public bool showAnchorResolveDebugOverlay = true; // 앵커 해결 상태를 화면에 표시
     public int maxAnchorDebugLines = 10; // 화면에 유지할 디버그 줄 수
     public float anchorTrackingWaitSeconds = 20.0f; // 앵커 생성 전 Tracking 대기 시간
-    public float markerHeightOffset = 12.0f; // 레거시 고정 오프셋 값(현재는 동적 오프셋 사용)
-    public float markerHeightOffsetNear = 2.5f; // 가까울 때 마커 높이
-    public float markerHeightOffsetFar = 7.0f; // 멀 때 마커 높이
-    public float markerHeightNearDistance = 15.0f; // 최소 높이 기준 거리
-    public float markerHeightFarDistance = 120.0f; // 최대 높이 기준 거리
-    public bool showScreenSpaceMarkers = false; // 화면 위 2D 마커 표시
-    public float screenMarkerHeightOffsetNear = 5.0f; // 가까울 때 2D 마커 기준 높이
-    public float screenMarkerHeightOffsetFar = 12.0f; // 멀 때 2D 마커 기준 높이
-    public float screenMarkerHeightNearDistance = 15.0f; // 2D 마커 최소 높이 기준 거리
-    public float screenMarkerHeightFarDistance = 120.0f; // 2D 마커 최대 높이 기준 거리
-    public float screenMarkerCameraHeightOffset = 0.0f; // 카메라 높이 기준 추가 보정값
-    public bool showWorldSpaceInfoMarker = false; // 중앙 건물의 월드 공간 라벨 표시
-    [Range(0.1f, 0.95f)] public float infoMarkerLerp = 0.6f; // 카메라-건물 사이 배치 비율
-    public float infoMarkerMinDistance = 8.0f; // 카메라와 너무 붙지 않도록 최소 거리
-    public float infoMarkerMaxDistance = 30.0f; // 너무 멀리 가지 않도록 최대 거리
     private BuildingMarker _currentActiveMarker; // 현재 선택된 마커 참조
 
     [Header("Geospatial Content")]
@@ -258,17 +237,12 @@ public class GeospatialManager : MonoBehaviour
         {
             case MarkerRenderMode.World3D:
                 showNearbyAnchors = true;
-                showScreenSpaceMarkers = false;
-                showWorldSpaceInfoMarker = false;
                 break;
             case MarkerRenderMode.Screen2D:
                 showNearbyAnchors = false;
-                showScreenSpaceMarkers = true;
-                showWorldSpaceInfoMarker = false;
                 break;
             case MarkerRenderMode.Both:
                 showNearbyAnchors = true;
-                showScreenSpaceMarkers = true;
                 break;
         }
     }
@@ -322,7 +296,7 @@ public class GeospatialManager : MonoBehaviour
             return;
         }
 
-        if (!TryGetPointerDownPosition(out Vector2 screenPosition, out int fingerId, out bool isTouch))
+        if (!TryGetPointerDownPosition(out Vector2 screenPosition))
         {
             return;
         }
@@ -353,11 +327,9 @@ public class GeospatialManager : MonoBehaviour
         arUIManager?.OpenDetailView(tappedBuilding);
     }
 
-    bool TryGetPointerDownPosition(out Vector2 screenPosition, out int fingerId, out bool isTouch)
+    bool TryGetPointerDownPosition(out Vector2 screenPosition)
     {
         screenPosition = default;
-        fingerId = -1;
-        isTouch = false;
 
         if (Input.touchCount > 0)
         {
@@ -368,8 +340,6 @@ public class GeospatialManager : MonoBehaviour
             }
 
             screenPosition = touch.position;
-            fingerId = touch.fingerId;
-            isTouch = true;
             return true;
         }
 
