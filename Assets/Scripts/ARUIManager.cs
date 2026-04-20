@@ -5,7 +5,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-public class ARUIManager : MonoBehaviour
+public partial class ARUIManager : MonoBehaviour
 {
     // --- Inspector Variables ---
     [Header("1. Main Cards")]
@@ -157,404 +157,6 @@ public class ARUIManager : MonoBehaviour
         UpdateCenterReticleAnimation();
     }
 
-    #region Main Card State Control
-    // 화면 상태 전환 (1번: 스캔 중)
-    public void SetScanningMode()
-    {
-        if (currentState == UIState.Scanning) return;
-        currentState = UIState.Scanning;
-        ShowCard(scanningCard, _scanRect, _scanGroup, statusCardPosY, ref _scanRoutine);
-        HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
-    }
-
-    // 화면 상태 전환 (2번: 건물 감지됨)
-    public void SetDetectedMode()
-    {
-        if (currentState == UIState.Detected) return;
-        currentState = UIState.Detected;
-        HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
-        ShowCard(detectedCard, _detectRect, _detectGroup, statusCardPosY, ref _detectRoutine);
-    }
-
-    // 화면 상태 전환 (3번: 요약 정보 표시)
-    public void ShowQuickInfo(BuildingData data)
-    {
-        ShowQuickInfo(data, -1f);
-    }
-
-    public void ShowQuickInfo(BuildingData data, float distanceMeters)
-    {
-        if (data == null)
-        {
-            return;
-        }
-
-        bool enteringQuickInfo = currentState != UIState.QuickInfo;
-        currentState = UIState.QuickInfo;
-        if (enteringQuickInfo)
-        {
-            HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
-            HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
-        }
-    }
-    #endregion
-
-    void EnsureCenterReticle()
-    {
-        if (!showCenterReticle)
-        {
-            if (_centerReticleRoot != null)
-            {
-                _centerReticleRoot.gameObject.SetActive(false);
-            }
-            return;
-        }
-
-        if (_centerReticleRoot == null)
-        {
-            GameObject rootObject = new GameObject("CenterReticle", typeof(RectTransform));
-            rootObject.transform.SetParent(transform, false);
-            _centerReticleRoot = rootObject.GetComponent<RectTransform>();
-            _centerReticleRoot.anchorMin = new Vector2(0.5f, 0.5f);
-            _centerReticleRoot.anchorMax = new Vector2(0.5f, 0.5f);
-            _centerReticleRoot.pivot = new Vector2(0.5f, 0.5f);
-            _centerReticleRoot.anchoredPosition = Vector2.zero;
-            _centerReticleRoot.sizeDelta = Vector2.zero;
-
-            CreateCenterReticleBar("TopBar", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0f), new Vector2(0f, centerReticleGap), false);
-            CreateCenterReticleBar("BottomBar", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, -centerReticleGap), false);
-            CreateCenterReticleBar("LeftBar", new Vector2(0.5f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-centerReticleGap, 0f), true);
-            CreateCenterReticleBar("RightBar", new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(centerReticleGap, 0f), true);
-        }
-
-        _centerReticleRoot.gameObject.SetActive(true);
-        _centerReticleRoot.SetAsLastSibling();
-    }
-
-    void EnsureDebugOverlay()
-    {
-        if (_debugOverlayRoot != null) return;
-
-        GameObject rootObject = new GameObject("DebugOverlay", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
-        rootObject.transform.SetParent(transform, false);
-        _debugOverlayRoot = rootObject.GetComponent<RectTransform>();
-        _debugOverlayRoot.anchorMin = new Vector2(0f, 1f);
-        _debugOverlayRoot.anchorMax = new Vector2(0f, 1f);
-        _debugOverlayRoot.pivot = new Vector2(0f, 1f);
-        _debugOverlayRoot.anchoredPosition = new Vector2(24f, -180f);
-        _debugOverlayRoot.sizeDelta = new Vector2(560f, 220f);
-
-        Image background = rootObject.GetComponent<Image>();
-        background.color = new Color(0.05f, 0.08f, 0.12f, 0.72f);
-        background.raycastTarget = true;
-
-        _debugOverlayScrollRect = rootObject.GetComponent<ScrollRect>();
-        _debugOverlayScrollRect.horizontal = false;
-        _debugOverlayScrollRect.vertical = true;
-        _debugOverlayScrollRect.movementType = ScrollRect.MovementType.Clamped;
-        _debugOverlayScrollRect.scrollSensitivity = 30f;
-
-        GameObject viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
-        viewportObject.transform.SetParent(rootObject.transform, false);
-
-        RectTransform viewportRect = viewportObject.GetComponent<RectTransform>();
-        viewportRect.anchorMin = Vector2.zero;
-        viewportRect.anchorMax = Vector2.one;
-        viewportRect.offsetMin = new Vector2(18f, 18f);
-        viewportRect.offsetMax = new Vector2(-18f, -18f);
-
-        Image viewportImage = viewportObject.GetComponent<Image>();
-        viewportImage.color = new Color(0f, 0f, 0f, 0f);
-        viewportImage.raycastTarget = true;
-
-        GameObject contentObject = new GameObject("Content", typeof(RectTransform));
-        contentObject.transform.SetParent(viewportObject.transform, false);
-        _debugOverlayContent = contentObject.GetComponent<RectTransform>();
-        _debugOverlayContent.anchorMin = new Vector2(0f, 1f);
-        _debugOverlayContent.anchorMax = new Vector2(1f, 1f);
-        _debugOverlayContent.pivot = new Vector2(0.5f, 1f);
-        _debugOverlayContent.anchoredPosition = Vector2.zero;
-        _debugOverlayContent.sizeDelta = Vector2.zero;
-
-        GameObject textObject = new GameObject("DebugText", typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(contentObject.transform, false);
-
-        RectTransform textRect = textObject.GetComponent<RectTransform>();
-        textRect.anchorMin = new Vector2(0f, 1f);
-        textRect.anchorMax = new Vector2(1f, 1f);
-        textRect.pivot = new Vector2(0.5f, 1f);
-        textRect.anchoredPosition = Vector2.zero;
-        textRect.sizeDelta = new Vector2(0f, 0f);
-
-        _debugOverlayText = textObject.GetComponent<TextMeshProUGUI>();
-        _debugOverlayText.fontSize = 20f;
-        _debugOverlayText.enableWordWrapping = true;
-        _debugOverlayText.overflowMode = TextOverflowModes.Overflow;
-        _debugOverlayText.color = new Color(0.92f, 0.97f, 1f, 1f);
-        _debugOverlayText.alignment = TextAlignmentOptions.TopLeft;
-        _debugOverlayText.raycastTarget = false;
-        _debugOverlayText.text = string.Empty;
-
-        ApplySharedTextStyle(_debugOverlayText);
-
-        _debugOverlayScrollRect.viewport = viewportRect;
-        _debugOverlayScrollRect.content = _debugOverlayContent;
-
-        _debugOverlayRoot.gameObject.SetActive(false);
-        _debugOverlayRoot.SetAsLastSibling();
-    }
-
-    public void SetDebugOverlay(string message)
-    {
-        EnsureDebugOverlay();
-
-        if (_debugOverlayRoot == null || _debugOverlayText == null)
-        {
-            return;
-        }
-
-        bool visible = !string.IsNullOrWhiteSpace(message);
-        _debugOverlayRoot.gameObject.SetActive(visible);
-        if (visible)
-        {
-            _debugOverlayText.text = message;
-            _debugOverlayText.ForceMeshUpdate();
-            Vector2 preferredSize = _debugOverlayText.GetPreferredValues(
-                message,
-                Mathf.Max(0f, _debugOverlayRoot.sizeDelta.x - 36f),
-                0f);
-
-            if (_debugOverlayContent != null)
-            {
-                _debugOverlayContent.sizeDelta = new Vector2(0f, preferredSize.y);
-            }
-
-            if (_debugOverlayScrollRect != null)
-            {
-                Canvas.ForceUpdateCanvases();
-                _debugOverlayScrollRect.verticalNormalizedPosition = 0f;
-            }
-
-            _debugOverlayRoot.SetAsLastSibling();
-        }
-    }
-
-    public void ClearDebugOverlay()
-    {
-        if (_debugOverlayRoot != null)
-        {
-            _debugOverlayRoot.gameObject.SetActive(false);
-        }
-
-        if (_debugOverlayText != null)
-        {
-            _debugOverlayText.text = string.Empty;
-        }
-
-        if (_debugOverlayContent != null)
-        {
-            _debugOverlayContent.sizeDelta = Vector2.zero;
-        }
-    }
-
-    void ApplySharedTextStyle(TextMeshProUGUI text)
-    {
-        if (text == null)
-        {
-            return;
-        }
-
-        if (SharedTMPFont != null)
-        {
-            text.font = SharedTMPFont;
-        }
-
-        if (SharedTMPMaterial != null)
-        {
-            text.fontSharedMaterial = SharedTMPMaterial;
-        }
-    }
-
-    void CreateCenterReticleBar(string name, Vector2 anchor, Vector2 pivot, Vector2 anchoredPosition, bool horizontal)
-    {
-        if (_centerReticleRoot == null)
-        {
-            return;
-        }
-
-        GameObject barObject = new GameObject(name, typeof(RectTransform), typeof(Image));
-        barObject.transform.SetParent(_centerReticleRoot, false);
-
-        RectTransform barRect = barObject.GetComponent<RectTransform>();
-        barRect.anchorMin = anchor;
-        barRect.anchorMax = anchor;
-        barRect.pivot = pivot;
-        barRect.anchoredPosition = anchoredPosition;
-        barRect.sizeDelta = horizontal
-            ? new Vector2(centerReticleBarLength, centerReticleBarThickness)
-            : new Vector2(centerReticleBarThickness, centerReticleBarLength);
-
-        Image barImage = barObject.GetComponent<Image>();
-        barImage.color = centerReticleColor;
-        barImage.raycastTarget = false;
-    }
-
-    void UpdateCenterReticleAnimation()
-    {
-        if (_centerReticleRoot == null || !_centerReticleRoot.gameObject.activeSelf)
-        {
-            return;
-        }
-
-        float duration = Mathf.Max(0.01f, centerReticlePulseDuration);
-        float cycle = (Mathf.Sin(Time.unscaledTime * (Mathf.PI * 2f / duration)) + 1f) * 0.5f;
-        float alpha = Mathf.Lerp(centerReticlePulseAlphaMin, centerReticlePulseAlphaMax, cycle);
-        float scale = Mathf.Lerp(1f, centerReticlePulseScale, cycle);
-
-        _centerReticleRoot.localScale = Vector3.one * scale;
-
-        for (int i = 0; i < _centerReticleRoot.childCount; i++)
-        {
-            Image barImage = _centerReticleRoot.GetChild(i).GetComponent<Image>();
-            if (barImage == null)
-            {
-                continue;
-            }
-
-            Color c = centerReticleColor;
-            c.a *= alpha;
-            barImage.color = c;
-        }
-    }
-
-    #region Detail View Control
-    public void SetWorldInfoDetailButtonState(BuildingData data, bool active)
-    {
-        EnsureWorldInfoDetailButton();
-
-        _worldInfoButtonData = active ? data : null;
-
-        if (worldInfoDetailButton == null)
-        {
-            return;
-        }
-
-        worldInfoDetailButton.interactable = active && data != null;
-
-        if (_worldInfoDetailButtonImage != null)
-        {
-            _worldInfoDetailButtonImage.color = worldInfoDetailButton.interactable
-                ? new Color(0.08f, 0.78f, 0.96f, 1f)
-                : new Color(0.28f, 0.32f, 0.38f, 0.9f);
-        }
-
-        if (_worldInfoDetailButtonText != null)
-        {
-            _worldInfoDetailButtonText.color = worldInfoDetailButton.interactable
-                ? Color.white
-                : new Color(0.82f, 0.86f, 0.9f, 0.9f);
-        }
-    }
-
-    public void OpenDetailView(BuildingData data)
-    {
-        if (uiToolkitDetailPanel == null)
-        {
-            Debug.LogWarning("UI Toolkit detail panel is not assigned.");
-            return;
-        }
-
-        _currentDetailData = data;
-        uiToolkitDetailPanel.Show(data);
-        OnDetailOpened?.Invoke();
-    }
-
-    public void CloseDetailView()
-    {
-        if (uiToolkitDetailPanel != null && uiToolkitDetailPanel.IsVisible)
-        {
-            uiToolkitDetailPanel.Hide();
-        }
-    }
-
-    void HandleUIToolkitDetailClosed()
-    {
-        OnDetailClosed?.Invoke();
-    }
-    #endregion
-
-    #region UI Utilities (Toast & Buttons)
-    // 토스트 메시지 표시
-    public void ShowToast(string message)
-    {
-        if (_toastRoutine != null) StopCoroutine(_toastRoutine);
-        _toastRoutine = StartCoroutine(ToastProcess(message));
-    }
-
-    IEnumerator ToastProcess(string message)
-    {
-        if (toastText != null) toastText.text = message;
-        toastPanel.SetActive(true);
-        CanvasGroup group = toastPanel.GetComponent<CanvasGroup>();
-        group.alpha = 0f;
-
-        float time = 0f;
-        while (time < 0.2f)
-        {
-            time += Time.deltaTime;
-            group.alpha = Mathf.Lerp(0f, 1f, time / 0.2f);
-            yield return null;
-        }
-        group.alpha = 1f;
-
-        yield return new WaitForSeconds(toastDuration);
-
-        time = 0f;
-        while (time < 0.3f)
-        {
-            time += Time.deltaTime;
-            group.alpha = Mathf.Lerp(1f, 0f, time / 0.3f);
-            yield return null;
-        }
-        toastPanel.SetActive(false);
-    }
-
-    void OnCopyAddress()
-    {
-        if (_currentDetailData != null)
-        {
-            GUIUtility.systemCopyBuffer = _currentDetailData.fetchedAddress;
-            ShowToast("주소가 복사되었습니다.");
-        }
-    }
-
-    void OnCallPhone()
-    {
-        if (_currentDetailData == null)
-        {
-            return;
-        }
-
-        string phoneNumber = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPhoneNumber : _currentDetailData.phoneNumber;
-        if (!string.IsNullOrEmpty(phoneNumber))
-        {
-            Application.OpenURL("tel:" + phoneNumber);
-        }
-    }
-
-    void OnOpenMap()
-    {
-        if (_currentDetailData == null)
-        {
-            return;
-        }
-
-        string placeUrl = uiToolkitDetailPanel != null ? uiToolkitDetailPanel.CurrentDisplayedPlaceUrl : _currentDetailData.placeUrl;
-        if (!string.IsNullOrEmpty(placeUrl))
-        {
-            Application.OpenURL(placeUrl);
-        }
-    }
     #region Navigation UI
     void EnsureSearchPanel()
     {
@@ -949,7 +551,7 @@ public class ARUIManager : MonoBehaviour
         tmp.fontStyle = style;
         tmp.color = Color.white;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         ApplySharedTextStyle(tmp);
         return tmp;
@@ -1133,7 +735,7 @@ public class ARUIManager : MonoBehaviour
         tmp.fontStyle = style;
         tmp.alignment = alignment;
         tmp.color = Color.white;
-        tmp.enableWordWrapping = false;
+        tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         ApplySharedTextStyle(tmp);
         return tmp;
@@ -1437,7 +1039,7 @@ public class ARUIManager : MonoBehaviour
 
     void EnsureNavigationManager()
     {
-        if (FindObjectOfType<NavigationManager>() != null) return;
+        if (FindFirstObjectByType<NavigationManager>() != null) return;
 
         GameObject navObj = new GameObject("NavigationManager");
         navObj.AddComponent<NavigationManager>();
@@ -1460,8 +1062,6 @@ public class ARUIManager : MonoBehaviour
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(true);
         SetScanningMode();
     }
-    #endregion
-
     #endregion
 
     #region Animations
