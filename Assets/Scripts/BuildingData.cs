@@ -16,6 +16,8 @@ public class BuildingData
     public string buildingName;
     public string description; // 카테고리
     public string fetchedAddress; 
+    public string lotNumberAddress;
+    public string roadAddress;
 
     // ★ 전화, 지도
     public string phoneNumber; 

@@ -18,23 +18,31 @@ public class BuildingMarker : MonoBehaviour
     public float animSpeed = 8.0f;
     public float labelHeight = 1.4f;
     public float previewDotSize = 3f;
-    public float titleFontSize = 8.7f;
-    public float subtitleFontSize = 4.8f;
-    public Vector2 buttonPlateSize = new Vector2(10.8f, 4.5f);
+    public float titleFontSize = 8.1f;
+    public float subtitleFontSize = 4.2f;
+    public float distanceFontSize = 4.3f;
+    public Vector2 buttonPlateSize = new Vector2(11.2f, 5.6f);
     public Texture2D labelBackgroundTexture;
     public TMP_FontAsset fontAssetOverride;
     public Material fontMaterialOverride;
     public Color hiddenColor = new Color(1f, 1f, 1f, 0f);
-    public Color previewColor = new Color(0.96f, 0.24f, 0.24f, 0.96f);
-    public Color activeColor = new Color(0.88f, 0.12f, 0.12f, 1.0f);
+    public Color previewColor = new Color(0.33f, 0.47f, 0.65f, 0.98f);
+    public Color activeColor = new Color(0.92f, 0.95f, 0.98f, 1.0f);
+    public Color titleTextColor = new Color(0.96f, 0.98f, 1f, 1f);
+    public Color subtitleTextColor = new Color(0.68f, 0.75f, 0.85f, 1f);
+    public Color distanceTextColor = new Color(0.52f, 0.84f, 0.97f, 1f);
+    public Color panelColor = new Color(0.06f, 0.10f, 0.15f, 0.94f);
+    public Color panelOutlineColor = new Color(0.18f, 0.26f, 0.38f, 0.92f);
 
     private Transform _visualRoot;
     private Transform _dotRoot;
     private TextMeshPro _titleText;
     private TextMeshPro _subtitleText;
+    private TextMeshPro _distanceText;
     private Vector3 _targetScaleVec = Vector3.zero;
     private string _title = string.Empty;
     private string _subtitle = string.Empty;
+    private string _distance = string.Empty;
     private bool _isInitialized;
     private bool _isInitializing;
     private MarkerVisualState _currentState = MarkerVisualState.Hidden;
@@ -108,8 +116,9 @@ public class BuildingMarker : MonoBehaviour
 
         CreateDotVisual();
         CreateButtonPlate(_visualRoot);
-        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 0.7f, 0f), titleFontSize, FontStyles.Bold);
-        _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, -0.18f, 0f), subtitleFontSize, FontStyles.Normal);
+        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 1.08f, 0f), titleFontSize, FontStyles.Bold);
+        _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, 0.18f, 0f), subtitleFontSize, FontStyles.Normal);
+        _distanceText = CreateTextNode("Distance", _visualRoot, new Vector3(0f, -0.76f, 0f), distanceFontSize, FontStyles.Bold);
         EnsureHitCollider();
     }
 
@@ -169,20 +178,20 @@ public class BuildingMarker : MonoBehaviour
         _buttonPlateRenderer = plateObject.GetComponent<Renderer>();
         if (_buttonPlateRenderer != null)
         {
-            Shader shader = Shader.Find("Unlit/Transparent");
+            Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
             {
-                shader = Shader.Find("Sprites/Default");
+                shader = Shader.Find("Unlit/Transparent");
             }
 
             if (shader != null)
             {
                 _buttonPlateMaterial = new Material(shader);
-                if (labelBackgroundTexture != null)
-                {
-                    _buttonPlateMaterial.mainTexture = labelBackgroundTexture;
-                }
+                _buttonPlateMaterial.mainTexture = labelBackgroundTexture != null
+                    ? labelBackgroundTexture
+                    : Texture2D.whiteTexture;
                 _buttonPlateRenderer.material = _buttonPlateMaterial;
+                ApplyPanelMaterialColor(1f);
             }
 
             _buttonPlateRenderer.shadowCastingMode = ShadowCastingMode.Off;
@@ -222,7 +231,7 @@ public class BuildingMarker : MonoBehaviour
         tmp.color = Color.white;
         tmp.outlineWidth = 0.2f;
         tmp.outlineColor = new Color(0f, 0f, 0f, 0.95f);
-        tmp.rectTransform.sizeDelta = new Vector2(24f, 4f);
+        tmp.rectTransform.sizeDelta = new Vector2(24f, 3.6f);
         ApplyFontSettings(tmp);
         return tmp;
     }
@@ -278,25 +287,61 @@ public class BuildingMarker : MonoBehaviour
             _subtitleText.text = hasSubtitle ? _subtitle : string.Empty;
             _subtitleText.gameObject.SetActive(hasSubtitle);
         }
+
+        if (_distanceText != null)
+        {
+            bool hasDistance = !string.IsNullOrWhiteSpace(_distance);
+            _distanceText.text = hasDistance ? _distance : string.Empty;
+            _distanceText.gameObject.SetActive(hasDistance);
+        }
     }
 
     void ApplyColor(Color color)
     {
         if (_titleText != null)
         {
-            _titleText.color = color;
+            _titleText.color = new Color(titleTextColor.r, titleTextColor.g, titleTextColor.b, Mathf.Clamp01(color.a));
         }
 
         if (_subtitleText != null)
         {
-            Color subtitleColor = new Color(color.r, color.g, color.b, Mathf.Clamp01(color.a * 0.9f));
-            _subtitleText.color = subtitleColor;
+            _subtitleText.color = new Color(subtitleTextColor.r, subtitleTextColor.g, subtitleTextColor.b, Mathf.Clamp01(color.a * 0.96f));
+        }
+
+        if (_distanceText != null)
+        {
+            _distanceText.color = new Color(distanceTextColor.r, distanceTextColor.g, distanceTextColor.b, Mathf.Clamp01(color.a));
         }
 
         if (_buttonPlateMaterial != null)
         {
-            float panelAlpha = Mathf.Clamp01(color.a * 0.96f);
-            _buttonPlateMaterial.color = new Color(1f, 1f, 1f, panelAlpha);
+            ApplyPanelMaterialColor(Mathf.Clamp01(color.a));
+        }
+    }
+
+    void ApplyPanelMaterialColor(float alphaMultiplier)
+    {
+        if (_buttonPlateMaterial == null)
+        {
+            return;
+        }
+
+        Color tint = new Color(
+            panelColor.r,
+            panelColor.g,
+            panelColor.b,
+            Mathf.Clamp01(panelColor.a * alphaMultiplier));
+
+        _buttonPlateMaterial.color = tint;
+
+        if (_buttonPlateMaterial.HasProperty("_Color"))
+        {
+            _buttonPlateMaterial.SetColor("_Color", tint);
+        }
+
+        if (_buttonPlateMaterial.HasProperty("_BaseColor"))
+        {
+            _buttonPlateMaterial.SetColor("_BaseColor", tint);
         }
     }
 
@@ -382,7 +427,7 @@ public class BuildingMarker : MonoBehaviour
         return configuredValue;
     }
 
-    public void SetInfoContent(string title, string subtitle)
+    public void SetInfoContent(string title, string subtitle, string distance)
     {
         if (!_isInitialized)
         {
@@ -395,6 +440,7 @@ public class BuildingMarker : MonoBehaviour
 
         _title = title;
         _subtitle = subtitle;
+        _distance = distance;
         RefreshText();
     }
 

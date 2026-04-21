@@ -551,6 +551,7 @@ public partial class GeospatialManager : MonoBehaviour
             if (marker != null && anchor != null)
             {
                 ApplyMarkerPlacement(marker, 0, 1);
+                UpdateMarkerInfoContent(marker, targetBuilding);
                 marker.SetInfoVisible(true);
                 marker.SetState(BuildingMarker.MarkerVisualState.Selected);
                 _currentActiveMarker = marker;
@@ -590,6 +591,71 @@ public partial class GeospatialManager : MonoBehaviour
                viewportPoint.y <= 1f - verticalMargin;
     }
 
+    void UpdateMarkerInfoContent(BuildingMarker marker, BuildingData building)
+    {
+        if (marker == null || building == null)
+        {
+            return;
+        }
+
+        marker.SetInfoContent(
+            building.buildingName,
+            GetMarkerCategoryLabel(building),
+            GetMarkerDistanceLabel(building));
+    }
+
+    string GetMarkerCategoryLabel(BuildingData building)
+    {
+        string category = building != null ? building.description : string.Empty;
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            return "장소";
+        }
+
+        int lastSeparatorIndex = category.LastIndexOf('>');
+        if (lastSeparatorIndex >= 0 && lastSeparatorIndex < category.Length - 1)
+        {
+            string trailingCategory = category.Substring(lastSeparatorIndex + 1).Trim();
+            if (!string.IsNullOrWhiteSpace(trailingCategory))
+            {
+                return trailingCategory;
+            }
+        }
+
+        return category.Trim();
+    }
+
+    string GetMarkerDistanceLabel(BuildingData building)
+    {
+        if (building == null || Input.location.status != LocationServiceStatus.Running)
+        {
+            return string.Empty;
+        }
+
+        LocationInfo currentLoc = Input.location.lastData;
+        float distanceMeters = (float)HaversineDistance(
+            currentLoc.latitude,
+            currentLoc.longitude,
+            building.latitude,
+            building.longitude);
+        return FormatMarkerDistance(distanceMeters);
+    }
+
+    string FormatMarkerDistance(float distanceMeters)
+    {
+        if (distanceMeters < 0f)
+        {
+            return string.Empty;
+        }
+
+        if (distanceMeters >= 1000f)
+        {
+            return $"{distanceMeters / 1000f:0.0}km";
+        }
+
+        return $"{Mathf.RoundToInt(distanceMeters)}m";
+    }
+
     void UpdatePreviewMarkers(List<VisibleBuildingCandidate> previewCandidates, BuildingData selectedBuilding)
     {
         List<string> orderedPreviewKeys = (previewCandidates ?? new List<VisibleBuildingCandidate>())
@@ -619,6 +685,7 @@ public partial class GeospatialManager : MonoBehaviour
             }
 
             bool isPreviewTarget = previewKeys.Contains(buildingKey);
+            UpdateMarkerInfoContent(marker, building);
             if (shouldSpreadDebugMarkers && isPreviewTarget)
             {
                 ResolvePreviewMarkerPlacement(buildingKey, orderedPreviewKeys, selectedKey, out int placementIndex, out int placementCount);
@@ -928,9 +995,7 @@ public partial class GeospatialManager : MonoBehaviour
             {
                 ApplyMarkerPlacement(marker, 0, 1);
                 marker.BindBuilding(building);
-                marker.SetInfoContent(
-                    building.buildingName,
-                    string.IsNullOrWhiteSpace(building.description) ? "장소 정보" : building.description);
+                UpdateMarkerInfoContent(marker, building);
                 marker.SetInfoVisible(true);
                 marker.SetState(BuildingMarker.MarkerVisualState.Preview, true);
                 AppendAnchorDebug($"TEXT ready: {TrimDebugLabel(building.buildingName)}");

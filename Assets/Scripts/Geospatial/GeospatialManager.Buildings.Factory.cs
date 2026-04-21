@@ -17,6 +17,12 @@ public partial class GeospatialManager
         newBuilding.latitude = double.Parse(anchorRepresentative.y);
         newBuilding.longitude = double.Parse(anchorRepresentative.x);
         newBuilding.altitude = 0;
+        newBuilding.lotNumberAddress = !string.IsNullOrWhiteSpace(GetLotNumberAddress(nameRepresentative))
+            ? GetLotNumberAddress(nameRepresentative)
+            : GetLotNumberAddress(detailRepresentative);
+        newBuilding.roadAddress = !string.IsNullOrWhiteSpace(GetRoadAddress(nameRepresentative))
+            ? GetRoadAddress(nameRepresentative)
+            : GetRoadAddress(detailRepresentative);
         newBuilding.fetchedAddress = !string.IsNullOrWhiteSpace(GetBestAddress(nameRepresentative))
             ? GetBestAddress(nameRepresentative)
             : GetBestAddress(detailRepresentative);

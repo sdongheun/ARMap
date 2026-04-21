@@ -61,6 +61,20 @@ public partial class GeospatialManager
         return document?.address_name ?? string.Empty;
     }
 
+    string GetRoadAddress(KakaoDocument document)
+    {
+        return string.IsNullOrWhiteSpace(document?.road_address_name)
+            ? string.Empty
+            : document.road_address_name;
+    }
+
+    string GetLotNumberAddress(KakaoDocument document)
+    {
+        return string.IsNullOrWhiteSpace(document?.address_name)
+            ? string.Empty
+            : document.address_name;
+    }
+
     string NormalizeText(string value)
     {
         return string.IsNullOrWhiteSpace(value)

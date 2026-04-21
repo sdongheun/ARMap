@@ -156,7 +156,6 @@ public partial class ARUIManager : MonoBehaviour
         {
             uiToolkitDetailPanel.OnClosed += HandleUIToolkitDetailClosed;
             uiToolkitDetailPanel.OnPhoneRequested += OnCallPhone;
-            uiToolkitDetailPanel.OnCopyRequested += OnCopyAddress;
             uiToolkitDetailPanel.OnMapRequested += OnOpenMap;
         }
 
@@ -184,11 +183,9 @@ public partial class ARUIManager : MonoBehaviour
         if (navigationHUD != null) navigationHUD.SetActive(false);
         if (offScreenIndicator != null) offScreenIndicator.gameObject.SetActive(false);
 
-        EnsureNavigationButton();
-        EnsureWorldInfoDetailButton();
-        EnsureLandscapeModeButton();
+        showCenterReticle = false;
         EnsureDebugModeButton();
-        EnsureBottomActionBar();
+        EnsureBottomActionBarToolkit();
         RefreshFloatingButtonLayout(force: true);
         EnsureCenterReticle();
     }
@@ -1192,6 +1189,8 @@ public partial class ARUIManager : MonoBehaviour
     // 가로모드 버튼의 색상과 문구를 현재 토글 상태에 맞춰 갱신한다.
     void SetLandscapeModeButtonState(bool enabled)
     {
+        UpdateToolkitLandscapeButtonState(enabled);
+
         if (landscapeModeButton == null)
         {
             return;
@@ -1308,109 +1307,17 @@ public partial class ARUIManager : MonoBehaviour
         _lastScreenHeight = Screen.height;
 
         bool isLandscapeLike = Screen.width > Screen.height;
-        EnsureBottomActionBar();
-        if (isLandscapeLike)
-        {
-            Vector2 sideButtonSize = new Vector2(50f, 20f);
-            float bottomInset = 18f;
+        EnsureBottomActionBarToolkit();
+        RefreshBottomActionBarToolkitLayout();
 
-            if (mainNavigateButton != null)
-            {
-                if (mainNavigateButton.transform.parent != _bottomActionBarRoot)
-                {
-                    mainNavigateButton.transform.SetParent(_bottomActionBarRoot, false);
-                }
-                mainNavigateButton.gameObject.SetActive(false);
-            }
+        if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
+        if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
+        if (landscapeModeButton != null) landscapeModeButton.gameObject.SetActive(false);
 
-            if (landscapeModeButton != null && landscapeModeButton.transform.parent != _bottomActionBarRoot)
-            {
-                landscapeModeButton.transform.SetParent(_bottomActionBarRoot, false);
-            }
-
-            if (worldInfoDetailButton != null && worldInfoDetailButton.transform.parent != _bottomActionBarRoot)
-            {
-                worldInfoDetailButton.transform.SetParent(_bottomActionBarRoot, false);
-            }
-
-            if (_bottomActionBarRoot != null)
-            {
-                float barWidth = (sideButtonSize.x * 2f) + 10f + 24f;
-                float barHeight = sideButtonSize.y + 20f;
-                _bottomActionBarRoot.gameObject.SetActive(true);
-                _bottomActionBarRoot.anchorMin = new Vector2(1f, 0f);
-                _bottomActionBarRoot.anchorMax = new Vector2(1f, 0f);
-                _bottomActionBarRoot.pivot = new Vector2(1f, 0f);
-                _bottomActionBarRoot.anchoredPosition = new Vector2(-24f, bottomInset);
-                _bottomActionBarRoot.sizeDelta = new Vector2(barWidth, barHeight);
-                _bottomActionBarRoot.SetAsLastSibling();
-            }
-
-            UpdateFloatingButtonRect(landscapeModeButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, sideButtonSize);
-            UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, sideButtonSize);
-
-            UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-24f, bottomInset + sideButtonSize.y + 10f), new Vector2(96f, 40f));
-
-            SetButtonTextSize(landscapeModeButton, 9f);
-            SetButtonTextSize(worldInfoDetailButton, 9f);
-        }
-        else
-        {
-            Vector2 barButtonSize = new Vector2(104f, 48f);
-            float bottomInset = 24f;
-            float barWidth = (barButtonSize.x * 3f) + (10f * 2f) + 24f;
-            float barHeight = 68f;
-
-            if (mainNavigateButton != null)
-            {
-                if (mainNavigateButton.transform.parent != _bottomActionBarRoot)
-                {
-                    mainNavigateButton.transform.SetParent(_bottomActionBarRoot, false);
-                }
-                mainNavigateButton.gameObject.SetActive(true);
-            }
-
-            if (landscapeModeButton != null && landscapeModeButton.transform.parent != _bottomActionBarRoot)
-            {
-                landscapeModeButton.transform.SetParent(_bottomActionBarRoot, false);
-            }
-
-            if (worldInfoDetailButton != null && worldInfoDetailButton.transform.parent != _bottomActionBarRoot)
-            {
-                worldInfoDetailButton.transform.SetParent(_bottomActionBarRoot, false);
-            }
-
-            if (_bottomActionBarRoot != null)
-            {
-                _bottomActionBarRoot.gameObject.SetActive(true);
-                _bottomActionBarRoot.anchorMin = new Vector2(0.5f, 0f);
-                _bottomActionBarRoot.anchorMax = new Vector2(0.5f, 0f);
-                _bottomActionBarRoot.pivot = new Vector2(0.5f, 0f);
-                _bottomActionBarRoot.anchoredPosition = new Vector2(0f, bottomInset);
-                _bottomActionBarRoot.sizeDelta = new Vector2(barWidth, barHeight);
-            }
-
-            UpdateFloatingButtonRect(mainNavigateButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, barButtonSize);
-            UpdateFloatingButtonRect(landscapeModeButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, barButtonSize);
-            UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, barButtonSize);
-
-            UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-24f, bottomInset + barButtonSize.y + 12f), new Vector2(120f, 56f));
-
-            SetButtonTextSize(landscapeModeButton, 18f);
-            SetButtonTextSize(worldInfoDetailButton, 18f);
-        }
-
-        if (landscapeModeButton != null)
-        {
-            landscapeModeButton.transform.SetAsLastSibling();
-        }
+        Vector2 debugSize = isLandscapeLike ? new Vector2(88f, 36f) : new Vector2(104f, 48f);
+        float debugBottomInset = isLandscapeLike ? 68f : 116f;
+        UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+            new Vector2(-24f, debugBottomInset), debugSize);
 
         if (debugModeButton != null)
         {
@@ -1456,36 +1363,10 @@ public partial class ARUIManager : MonoBehaviour
         buttonText.fontSize = fontSize;
     }
 
-    // 세로모드에서 3개 버튼을 담는 둥근 플로팅 바를 생성한다.
+    // 레거시 uGUI 플로팅 바 생성 루틴은 더 이상 사용하지 않는다.
     void EnsureBottomActionBar()
     {
-        if (_bottomActionBarRoot != null)
-        {
-            return;
-        }
-
-        GameObject rootObject = new GameObject("BottomActionBar", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
-        rootObject.transform.SetParent(transform, false);
-
-        _bottomActionBarRoot = rootObject.GetComponent<RectTransform>();
-        _bottomActionBarBackground = rootObject.GetComponent<Image>();
-        _bottomActionBarLayout = rootObject.GetComponent<HorizontalLayoutGroup>();
-
-        _bottomActionBarRoundedSprite = CreateRoundedRectSprite(
-            Mathf.Max(16, bottomActionBarSpriteSize),
-            Mathf.Clamp(bottomActionBarCornerRadius, 2, Mathf.Max(4, bottomActionBarSpriteSize / 2)));
-        _bottomActionBarBackground.sprite = _bottomActionBarRoundedSprite;
-        _bottomActionBarBackground.type = _bottomActionBarRoundedSprite != null ? Image.Type.Sliced : Image.Type.Simple;
-        _bottomActionBarBackground.color = new Color(0.07f, 0.10f, 0.15f, 0.88f);
-        _bottomActionBarBackground.raycastTarget = false;
-
-        _bottomActionBarLayout.spacing = 10f;
-        _bottomActionBarLayout.padding = new RectOffset(12, 12, 10, 10);
-        _bottomActionBarLayout.childAlignment = TextAnchor.MiddleCenter;
-        _bottomActionBarLayout.childControlWidth = false;
-        _bottomActionBarLayout.childControlHeight = false;
-        _bottomActionBarLayout.childForceExpandWidth = false;
-        _bottomActionBarLayout.childForceExpandHeight = false;
+        return;
     }
 
     // 지정한 radius를 가진 rounded rectangle 9-slice 스프라이트를 런타임에 만든다.
@@ -1550,6 +1431,10 @@ public partial class ARUIManager : MonoBehaviour
         SetStatusBadgeMessage(null);
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
+        _toolkitBottomBarNavigationMode = true;
+        if (_toolkitNavigateButton != null) _toolkitNavigateButton.style.display = UnityEngine.UIElements.DisplayStyle.None;
+        if (_toolkitDetailButton != null) _toolkitDetailButton.style.display = UnityEngine.UIElements.DisplayStyle.None;
+        RefreshBottomActionBarToolkitLayout();
     }
 
     // 내비 모드 종료 시 HUD를 정리하고 기본 스캔 상태 UI로 복귀한다.
@@ -1559,6 +1444,10 @@ public partial class ARUIManager : MonoBehaviour
         HideSearchPanel();
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(true);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(true);
+        _toolkitBottomBarNavigationMode = false;
+        if (_toolkitNavigateButton != null) _toolkitNavigateButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
+        if (_toolkitDetailButton != null) _toolkitDetailButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
+        RefreshBottomActionBarToolkitLayout();
         SetScanningMode();
     }
     #endregion
