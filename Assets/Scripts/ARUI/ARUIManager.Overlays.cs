@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 public partial class ARUIManager
 {
+    // 화면 중앙 조준점 UI를 필요 시 생성하고 최상단에 유지한다.
     void EnsureCenterReticle()
     {
         if (!showCenterReticle)
@@ -36,6 +37,7 @@ public partial class ARUIManager
         _centerReticleRoot.SetAsLastSibling();
     }
 
+    // 스크롤 가능한 디버그 오버레이를 런타임에 생성한다.
     void EnsureDebugOverlay()
     {
         if (_debugOverlayRoot != null) return;
@@ -109,6 +111,7 @@ public partial class ARUIManager
         _debugOverlayRoot.SetAsLastSibling();
     }
 
+    // 디버그 메시지를 오버레이에 표시하고 최신 줄이 보이도록 스크롤을 맞춘다.
     public void SetDebugOverlay(string message)
     {
         EnsureDebugOverlay();
@@ -144,6 +147,7 @@ public partial class ARUIManager
         }
     }
 
+    // 디버그 오버레이를 숨기고 내부 표시 내용을 초기화한다.
     public void ClearDebugOverlay()
     {
         if (_debugOverlayRoot != null)
@@ -162,6 +166,7 @@ public partial class ARUIManager
         }
     }
 
+    // 런타임 생성 TMP 텍스트가 공통 폰트와 머티리얼을 재사용하게 만든다.
     void ApplySharedTextStyle(TextMeshProUGUI text)
     {
         if (text == null)
@@ -180,6 +185,7 @@ public partial class ARUIManager
         }
     }
 
+    // 중앙 레티클을 구성하는 막대 하나를 생성한다.
     void CreateCenterReticleBar(string name, Vector2 anchor, Vector2 pivot, Vector2 anchoredPosition, bool horizontal)
     {
         if (_centerReticleRoot == null)
@@ -204,6 +210,7 @@ public partial class ARUIManager
         barImage.raycastTarget = false;
     }
 
+    // 중앙 레티클의 크기와 투명도를 시간에 따라 변화시켜 시각 효과를 준다.
     void UpdateCenterReticleAnimation()
     {
         if (_centerReticleRoot == null || !_centerReticleRoot.gameObject.activeSelf)

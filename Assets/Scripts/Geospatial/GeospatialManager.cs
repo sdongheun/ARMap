@@ -99,8 +99,8 @@ public partial class GeospatialManager : MonoBehaviour
     [Header("Marker Settings")]
     public GameObject buildingMarkerPrefab;  // 건물 마커 프리팹
     public bool showNearbyAnchors = true;    // 근처 앵커 항상 표시
-    public bool debugForceShowAllWorldMarkers = true; // 시야 판정과 무관하게 생성된 3D 마커 강제 표시
-    public bool debugPlaceWorldMarkersInFrontOfCamera = true; // 생성된 3D 마커를 카메라 앞에 강제 배치
+    public bool debugForceShowAllWorldMarkers = false; // 시야 판정과 무관하게 생성된 3D 마커 강제 표시
+    public bool debugPlaceWorldMarkersInFrontOfCamera = false; // 생성된 3D 마커를 카메라 앞에 강제 배치
     public float debugFrontMarkerDistance = 10.0f; // 카메라 앞 디버그 거리
     public float debugFrontMarkerHeightOffset = -0.2f; // 카메라 기준 높이 오프셋
     public float debugFrontMarkerHorizontalSpacing = 0.7f; // 여러 마커 간 가로 간격
@@ -135,6 +135,12 @@ public partial class GeospatialManager : MonoBehaviour
     [Range(0.01f, 0.35f)] public float centerViewportThreshold = 0.42f; // 정보 카드 허용 중심 범위
     [Range(0.01f, 0.25f)] public float forwardGroupViewportThreshold = 0.14f; // 같은 전방 시야선상 판정 범위
     public float groupedCandidateDistanceBias = 6.0f; // 같은 그룹에서 후면 후보를 제거하는 최소 거리차
+    [Header("Landscape Detection Profile")]
+    public float landscapeDetectionRadius = 140.0f; // 가로모드에서 더 넓게 허용할 감지 반경
+    public float landscapeDetectionAngle = 180.0f; // 가로모드에서 좌우로 더 많이 보이도록 확장한 감지 각도
+    public int landscapeMaxPreviewAnchors = 5; // 가로모드에서 동시에 유지할 최대 앵커 수
+    [Range(0.01f, 0.35f)] public float landscapeCenterViewportThreshold = 0.30f; // 가로모드에서 중앙 텍스트 선택을 더 엄격하게 하는 범위
+    [Range(0.01f, 0.25f)] public float landscapeForwardGroupViewportThreshold = 0.10f; // 가로모드에서 좌우 후보를 더 많이 살리기 위한 그룹 판정 범위
 
     // --- Internal Variables ---
     private Transform _cameraTransform; // 카메라 트랜스폼 참조
@@ -153,9 +159,18 @@ public partial class GeospatialManager : MonoBehaviour
     public bool isNavigationActive = false;
     private readonly List<string> _anchorDebugLines = new List<string>();
     private string _lastDetectionDebugSignature = string.Empty;
+    private float _portraitDetectionRadius;
+    private float _portraitDetectionAngle;
+    private int _portraitMaxPreviewAnchors;
+    private float _portraitCenterViewportThreshold;
+    private float _portraitForwardGroupViewportThreshold;
+    private bool _isRuntimeDebugModeEnabled;
+    private bool _defaultShowAnchorResolveDebugOverlay;
 
     void Awake()
     {
+        CachePortraitDetectionProfile();
+        _defaultShowAnchorResolveDebugOverlay = showAnchorResolveDebugOverlay;
         ApplyMarkerModeConfiguration();
     }
 
@@ -168,12 +183,15 @@ public partial class GeospatialManager : MonoBehaviour
     {
         TryLoadApiKeysFromLocalFile();
         _cameraTransform = Camera.main.transform; // 메인 카메라 트랜스폼 참조
+        DisableRuntimeDebugFrontMarkerPlacement();
         ApplyMarkerModeConfiguration();
 
         if (arUIManager != null)
         {
             arUIManager.OnDetailOpened += () => _isViewingInfo = true;
             arUIManager.OnDetailClosed += () => _isViewingInfo = false;
+            arUIManager.OnLandscapeModeToggleRequested += HandleLandscapeModeToggleRequested;
+            arUIManager.OnDebugModeToggleRequested += HandleDebugModeToggleRequested;
         }
         else
         {
@@ -210,6 +228,90 @@ public partial class GeospatialManager : MonoBehaviour
         {
             yield return new WaitForSeconds(1.0f);
         }
+    }
+
+    void DisableRuntimeDebugFrontMarkerPlacement()
+    {
+        _isRuntimeDebugModeEnabled = false;
+        debugForceShowAllWorldMarkers = false;
+        debugPlaceWorldMarkersInFrontOfCamera = false;
+        showAnchorResolveDebugOverlay = false;
+        arUIManager?.ClearDebugOverlay();
+    }
+
+    void HandleDebugModeToggleRequested(bool enabled)
+    {
+        _isRuntimeDebugModeEnabled = enabled;
+        debugForceShowAllWorldMarkers = enabled;
+        debugPlaceWorldMarkersInFrontOfCamera = enabled;
+        showAnchorResolveDebugOverlay = enabled && _defaultShowAnchorResolveDebugOverlay;
+
+        if (!showAnchorResolveDebugOverlay)
+        {
+            ResetAnchorDebugOverlay();
+        }
+
+        AppendAnchorDebug(enabled
+            ? "Debug front marker mode: ON"
+            : "Debug front marker mode: OFF");
+        RefreshDetectionForCurrentDisplayMode();
+    }
+
+    void CachePortraitDetectionProfile()
+    {
+        _portraitDetectionRadius = detectionRadius;
+        _portraitDetectionAngle = detectionAngle;
+        _portraitMaxPreviewAnchors = maxPreviewAnchors;
+        _portraitCenterViewportThreshold = centerViewportThreshold;
+        _portraitForwardGroupViewportThreshold = forwardGroupViewportThreshold;
+    }
+
+    void HandleLandscapeModeToggleRequested(bool enabled)
+    {
+        ApplyLandscapeDetectionProfile(enabled);
+        RefreshDetectionForCurrentDisplayMode();
+    }
+
+    void ApplyLandscapeDetectionProfile(bool enabled)
+    {
+        if (enabled)
+        {
+            detectionRadius = landscapeDetectionRadius;
+            detectionAngle = landscapeDetectionAngle;
+            maxPreviewAnchors = landscapeMaxPreviewAnchors;
+            centerViewportThreshold = landscapeCenterViewportThreshold;
+            forwardGroupViewportThreshold = landscapeForwardGroupViewportThreshold;
+            return;
+        }
+
+        detectionRadius = _portraitDetectionRadius;
+        detectionAngle = _portraitDetectionAngle;
+        maxPreviewAnchors = _portraitMaxPreviewAnchors;
+        centerViewportThreshold = _portraitCenterViewportThreshold;
+        forwardGroupViewportThreshold = _portraitForwardGroupViewportThreshold;
+    }
+
+    void RefreshDetectionForCurrentDisplayMode()
+    {
+        _lastDetectionDebugSignature = string.Empty;
+        _lastAnchorPoolSignature = string.Empty;
+
+        if (!ShouldRenderWorldMarkers())
+        {
+            return;
+        }
+
+        if (_isReloadingData || _isAnchorSetupInProgress || _isViewingInfo || isNavigationActive)
+        {
+            return;
+        }
+
+        if (EarthManager == null || EarthManager.EarthTrackingState != TrackingState.Tracking)
+        {
+            return;
+        }
+
+        CheckBuildingDetection();
     }
 
     void ApplyMarkerModeConfiguration()
@@ -450,7 +552,8 @@ public partial class GeospatialManager : MonoBehaviour
                 marker.SetInfoVisible(true);
                 marker.SetState(BuildingMarker.MarkerVisualState.Selected);
                 _currentActiveMarker = marker;
-                arUIManager?.SetWorldInfoDetailButtonState(targetBuilding, true);
+                bool isMarkerVisibleOnScreen = IsSelectedMarkerVisibleOnScreen(marker);
+                arUIManager?.SetWorldInfoDetailButtonState(targetBuilding, isMarkerVisibleOnScreen);
                 return;
             }
         }
@@ -458,13 +561,46 @@ public partial class GeospatialManager : MonoBehaviour
         arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
 
+    bool IsSelectedMarkerVisibleOnScreen(BuildingMarker marker)
+    {
+        if (marker == null || !marker.IsSelectedTextVisible())
+        {
+            return false;
+        }
+
+        Camera currentCamera = Camera.main;
+        if (currentCamera == null)
+        {
+            return false;
+        }
+
+        Vector3 viewportPoint = currentCamera.WorldToViewportPoint(marker.GetTextAnchorWorldPosition());
+        if (viewportPoint.z <= 0f)
+        {
+            return false;
+        }
+
+        const float horizontalMargin = 0.05f;
+        const float verticalMargin = 0.08f;
+        return viewportPoint.x >= horizontalMargin &&
+               viewportPoint.x <= 1f - horizontalMargin &&
+               viewportPoint.y >= verticalMargin &&
+               viewportPoint.y <= 1f - verticalMargin;
+    }
+
     void UpdatePreviewMarkers(List<VisibleBuildingCandidate> previewCandidates, BuildingData selectedBuilding)
     {
+        List<string> orderedPreviewKeys = (previewCandidates ?? new List<VisibleBuildingCandidate>())
+            .Where(candidate => candidate?.building != null)
+            .Select(candidate => GetBuildingAnchorKey(candidate.building))
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Distinct()
+            .ToList();
         HashSet<string> previewKeys = new HashSet<string>(
-            (previewCandidates ?? new List<VisibleBuildingCandidate>())
-                .Where(candidate => candidate?.building != null)
-                .Select(candidate => GetBuildingAnchorKey(candidate.building))
-                .Where(key => !string.IsNullOrWhiteSpace(key)));
+            orderedPreviewKeys);
+        string selectedKey = GetBuildingAnchorKey(selectedBuilding);
+        bool shouldSpreadDebugMarkers = debugForceShowAllWorldMarkers &&
+                                        debugPlaceWorldMarkersInFrontOfCamera;
 
         foreach (var building in _autoGeneratedBuildingList)
         {
@@ -480,8 +616,17 @@ public partial class GeospatialManager : MonoBehaviour
                 continue;
             }
 
-            ApplyMarkerPlacement(marker, 0, 1);
             bool isPreviewTarget = previewKeys.Contains(buildingKey);
+            if (shouldSpreadDebugMarkers && isPreviewTarget)
+            {
+                ResolvePreviewMarkerPlacement(buildingKey, orderedPreviewKeys, selectedKey, out int placementIndex, out int placementCount);
+                ApplyMarkerPlacement(marker, placementIndex, placementCount);
+            }
+            else
+            {
+                ApplyMarkerPlacement(marker, 0, 1);
+            }
+
             marker.SetInfoVisible(enableWorldTextMarker && isPreviewTarget);
             marker.SetState(enableWorldTextMarker && isPreviewTarget
                 ? BuildingMarker.MarkerVisualState.Preview
@@ -506,6 +651,47 @@ public partial class GeospatialManager : MonoBehaviour
             UpdateMarkerScale(selectedBuilding);
         }
 
+    }
+
+    void ResolvePreviewMarkerPlacement(
+        string buildingKey,
+        List<string> orderedPreviewKeys,
+        string selectedKey,
+        out int placementIndex,
+        out int placementCount)
+    {
+        placementCount = Mathf.Max(1, orderedPreviewKeys?.Count ?? 0);
+        placementIndex = 0;
+
+        if (placementCount <= 1 || string.IsNullOrWhiteSpace(buildingKey) || orderedPreviewKeys == null)
+        {
+            return;
+        }
+
+        int centerSlot = placementCount / 2;
+        if (!string.IsNullOrWhiteSpace(selectedKey) && buildingKey == selectedKey)
+        {
+            placementIndex = centerSlot;
+            return;
+        }
+
+        int compactIndex = 0;
+        foreach (string key in orderedPreviewKeys)
+        {
+            if (string.IsNullOrWhiteSpace(key) || key == selectedKey)
+            {
+                continue;
+            }
+
+            if (key == buildingKey)
+            {
+                placementIndex = compactIndex >= centerSlot ? compactIndex + 1 : compactIndex;
+                placementIndex = Mathf.Clamp(placementIndex, 0, placementCount - 1);
+                return;
+            }
+
+            compactIndex++;
+        }
     }
 
     void ResetAllMarkers()
@@ -612,7 +798,7 @@ public partial class GeospatialManager : MonoBehaviour
         }
 
         bool shouldUseDebugFrontPlacement = debugForceShowAllWorldMarkers &&
-                                            (debugPlaceWorldMarkersInFrontOfCamera || _buildingAnchors.Count <= 1);
+                                            debugPlaceWorldMarkersInFrontOfCamera;
 
         if (shouldUseDebugFrontPlacement)
         {
@@ -631,40 +817,6 @@ public partial class GeospatialManager : MonoBehaviour
 
         Vector3 anchorPosition = anchorTransform.position;
         Vector3 targetPosition = anchorPosition + (Vector3.up * worldMarkerLocalOffsetMeters);
-
-        if (_cameraTransform != null)
-        {
-            Vector3 horizontalToCamera = _cameraTransform.position - anchorPosition;
-            horizontalToCamera.y = 0f;
-
-            if (horizontalToCamera.sqrMagnitude < 0.0001f)
-            {
-                horizontalToCamera = _cameraTransform.forward;
-                horizontalToCamera.y = 0f;
-            }
-
-            if (horizontalToCamera.sqrMagnitude > 0.0001f)
-            {
-                float distanceToAnchor = Vector3.Distance(_cameraTransform.position, anchorPosition);
-                float shellRadius = Mathf.Clamp(
-                    distanceToAnchor * Mathf.Max(0f, worldMarkerShellDistanceScale),
-                    Mathf.Max(0f, worldMarkerShellMinRadius),
-                    Mathf.Max(worldMarkerShellMinRadius, worldMarkerShellMaxRadius));
-                float nearLimit = distanceToAnchor * Mathf.Max(0f, worldMarkerShellNearLimitFactor);
-                if (nearLimit > 0f)
-                {
-                    shellRadius = Mathf.Min(shellRadius, nearLimit);
-                }
-
-                targetPosition = anchorPosition + (horizontalToCamera.normalized * shellRadius) + (Vector3.up * worldMarkerLocalOffsetMeters);
-
-                float targetHeightAboveCamera = Mathf.Clamp(
-                    distanceToAnchor * Mathf.Max(0f, worldMarkerHeightDistanceScale),
-                    Mathf.Max(0f, worldMarkerMinHeightAboveCamera),
-                    Mathf.Max(worldMarkerMinHeightAboveCamera, worldMarkerMaxHeightAboveCamera));
-                targetPosition.y = _cameraTransform.position.y + targetHeightAboveCamera - marker.GetVisualHeightOffset();
-            }
-        }
 
         marker.transform.position = targetPosition;
         marker.transform.localRotation = Quaternion.identity;

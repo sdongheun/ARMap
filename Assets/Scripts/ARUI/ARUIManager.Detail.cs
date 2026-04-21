@@ -4,6 +4,7 @@ using UnityEngine;
 public partial class ARUIManager
 {
     #region Detail View Control
+    // 월드 선택 대상에 맞춰 상세 버튼의 활성 상태와 시각 스타일을 갱신한다.
     public void SetWorldInfoDetailButtonState(BuildingData data, bool active)
     {
         EnsureWorldInfoDetailButton();
@@ -32,6 +33,7 @@ public partial class ARUIManager
         }
     }
 
+    // 상세 패널에 건물 데이터를 바인딩하고 열림 이벤트를 외부에 알린다.
     public void OpenDetailView(BuildingData data)
     {
         if (uiToolkitDetailPanel == null)
@@ -45,6 +47,7 @@ public partial class ARUIManager
         OnDetailOpened?.Invoke();
     }
 
+    // 현재 표시 중인 상세 패널을 닫는다.
     public void CloseDetailView()
     {
         if (uiToolkitDetailPanel != null && uiToolkitDetailPanel.IsVisible)
@@ -53,6 +56,7 @@ public partial class ARUIManager
         }
     }
 
+    // UI Toolkit 패널의 닫힘 콜백을 일반 상세 닫힘 이벤트로 중계한다.
     void HandleUIToolkitDetailClosed()
     {
         OnDetailClosed?.Invoke();
@@ -60,12 +64,14 @@ public partial class ARUIManager
     #endregion
 
     #region UI Utilities
+    // 이전 토스트를 중단하고 새 토스트 표시 코루틴을 시작한다.
     public void ShowToast(string message)
     {
         if (_toastRoutine != null) StopCoroutine(_toastRoutine);
         _toastRoutine = StartCoroutine(ToastProcess(message));
     }
 
+    // 토스트를 페이드 인, 유지, 페이드 아웃 순서로 표시한다.
     IEnumerator ToastProcess(string message)
     {
         if (toastText != null) toastText.text = message;
@@ -95,6 +101,7 @@ public partial class ARUIManager
         toastPanel.SetActive(false);
     }
 
+    // 현재 상세 주소를 클립보드에 복사하고 완료 토스트를 띄운다.
     void OnCopyAddress()
     {
         if (_currentDetailData != null)
@@ -104,6 +111,7 @@ public partial class ARUIManager
         }
     }
 
+    // 현재 상세 정보의 전화번호로 시스템 전화 앱을 연다.
     void OnCallPhone()
     {
         if (_currentDetailData == null)
@@ -121,6 +129,7 @@ public partial class ARUIManager
         }
     }
 
+    // 현재 상세 정보의 지도 URL을 시스템 브라우저로 연다.
     void OnOpenMap()
     {
         if (_currentDetailData == null)

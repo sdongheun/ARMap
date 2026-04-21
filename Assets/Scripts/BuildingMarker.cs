@@ -408,6 +408,25 @@ public class BuildingMarker : MonoBehaviour
         return _boundBuilding;
     }
 
+    public bool IsSelectedTextVisible()
+    {
+        return _isInitialized &&
+               _isInfoVisible &&
+               _currentState == MarkerVisualState.Selected &&
+               _visualRoot != null &&
+               _visualRoot.gameObject.activeInHierarchy;
+    }
+
+    public Vector3 GetTextAnchorWorldPosition()
+    {
+        if (_visualRoot != null)
+        {
+            return _visualRoot.position;
+        }
+
+        return transform.position + (Vector3.up * labelHeight);
+    }
+
     public float GetVisualHeightOffset()
     {
         return labelHeight;

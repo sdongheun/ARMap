@@ -21,9 +21,9 @@ public partial class ARUIManager : MonoBehaviour
     public ARDetailPanelDocumentController uiToolkitDetailPanel;
 
     [Header("4. Animation Settings")]
-    public float animDuration = 0.3f; 
-    public float slideOffset = 150f; 
-    public float statusCardPosY = 0f;    
+    public float animDuration = 0.3f;
+    public float slideOffset = 150f;
+    public float statusCardPosY = 0f;
 
     [Header("5. Toast Message")]
     public GameObject toastPanel;
@@ -51,6 +51,8 @@ public partial class ARUIManager : MonoBehaviour
     public Button mainNavigateButton;
     public Button detailNavigateButton;
     public Button worldInfoDetailButton;
+    public Button landscapeModeButton;
+    public Button debugModeButton;
     [Header("9. Center Reticle")]
     public bool showCenterReticle = true;
     public Color centerReticleColor = new Color(1f, 1f, 1f, 0.72f);
@@ -69,9 +71,16 @@ public partial class ARUIManager : MonoBehaviour
     public event Action<BuildingData> OnNavigateFromDetailRequested;
     public event Action OnStopNavigationRequested;
     public event Action OnRecalibrateRequested;
+    public event Action<bool> OnLandscapeModeToggleRequested;
+    public event Action<bool> OnDebugModeToggleRequested;
     private bool _stopButtonBound;
     private bool _recalibrateButtonBound;
+    private bool _isLandscapeModeEnabled;
+    private bool _isDebugModeEnabled;
+    private int _lastScreenWidth;
+    private int _lastScreenHeight;
 
+    // 안내 중지 버튼을 한 번만 이벤트에 연결한다.
     void BindStopNavigationButton()
     {
         if (_stopButtonBound || stopNavigationButton == null) return;
@@ -79,6 +88,7 @@ public partial class ARUIManager : MonoBehaviour
         _stopButtonBound = true;
     }
 
+    // 화면 보정 버튼을 한 번만 이벤트에 연결한다.
     void BindRecalibrateButton()
     {
         if (_recalibrateButtonBound || recalibrateButton == null) return;
@@ -107,6 +117,7 @@ public partial class ARUIManager : MonoBehaviour
         : TMP_Settings.instance != null ? TMP_Settings.defaultFontAsset : null;
     private Material SharedTMPMaterial => toastText != null ? toastText.fontSharedMaterial : null;
 
+    // 상태 카드와 캔버스 관련 참조를 미리 캐시한다.
     void Awake()
     {
         _scanRect = scanningCard.GetComponent<RectTransform>(); _scanGroup = scanningCard.GetComponent<CanvasGroup>();
@@ -115,6 +126,7 @@ public partial class ARUIManager : MonoBehaviour
         _canvas = GetComponent<Canvas>();
     }
 
+    // 시작 시 상세 패널, 버튼, 카드 초기 상태를 한 번에 연결한다.
     void Start()
     {
         if (uiToolkitDetailPanel != null)
@@ -149,15 +161,21 @@ public partial class ARUIManager : MonoBehaviour
 
         EnsureNavigationButton();
         EnsureWorldInfoDetailButton();
+        EnsureLandscapeModeButton();
+        EnsureDebugModeButton();
+        RefreshFloatingButtonLayout(force: true);
         EnsureCenterReticle();
     }
 
+    // 프레임마다 중앙 레티클 애니메이션만 갱신한다.
     void Update()
     {
+        RefreshFloatingButtonLayout();
         UpdateCenterReticleAnimation();
     }
 
     #region Navigation UI
+    // 검색 패널 전체를 코드로 생성하고 입력/결과/상태 표시를 연결한다.
     void EnsureSearchPanel()
     {
         if (navigationSearchPanel != null) return;
@@ -325,6 +343,7 @@ public partial class ARUIManager : MonoBehaviour
     private GameObject _reroutingIndicator;
     private Coroutine _reroutingAnimRoutine;
 
+    // 검색 패널을 로딩 문구만 보이는 상태로 초기화한다.
     public void ShowSearchLoading()
     {
         EnsureSearchPanel();
@@ -337,6 +356,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 검색 결과가 없을 때 안내 문구만 보이는 상태로 초기화한다.
     public void ShowEmptyResults(string message)
     {
         EnsureSearchPanel();
@@ -349,11 +369,13 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 검색 패널의 상태 문구를 숨긴다.
     void HideSearchStatus()
     {
         if (_searchStatusText != null) _searchStatusText.SetActive(false);
     }
 
+    // 입력 필드용 TMP 텍스트 오브젝트를 생성한다.
     GameObject CreateInputText(string name, Transform parent, string text, float alpha)
     {
         GameObject obj = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -373,6 +395,7 @@ public partial class ARUIManager : MonoBehaviour
         return obj;
     }
 
+    // 검색 패널과 HUD에서 재사용하는 공통 버튼 UI를 생성한다.
     Button CreatePanelButton(string name, Transform parent, string label,
         Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
         Vector2 anchoredPos, Vector2 sizeDelta, Color bgColor)
@@ -407,6 +430,7 @@ public partial class ARUIManager : MonoBehaviour
         return btnObj.GetComponent<Button>();
     }
 
+    // 검색 패널을 열고 입력/결과/상태를 초기화한다.
     public void ShowSearchPanel()
     {
         EnsureSearchPanel();
@@ -420,12 +444,14 @@ public partial class ARUIManager : MonoBehaviour
         HideSearchStatus();
     }
 
+    // 검색 패널을 비활성화한다.
     public void HideSearchPanel()
     {
         if (navigationSearchPanel != null)
             navigationSearchPanel.SetActive(false);
     }
 
+    // 검색 결과 리스트를 새로 만들고 각 항목의 선택 콜백을 연결한다.
     public void UpdateSearchResults(List<DestinationResult> results, Action<DestinationResult> onSelect)
     {
         ClearSearchResults();
@@ -454,6 +480,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 검색 결과 한 항목의 시각 요소를 프리팹 또는 코드 생성으로 구성한다.
     GameObject CreateSearchResultItem(DestinationResult result)
     {
         string distanceStr = FormatDistance(result.distance);
@@ -526,6 +553,7 @@ public partial class ARUIManager : MonoBehaviour
         return itemObj;
     }
 
+    // 검색 결과에서 쓸 거리 문자열을 m/km 형식으로 포맷한다.
     string FormatDistance(int meters)
     {
         if (meters <= 0) return "";
@@ -533,6 +561,7 @@ public partial class ARUIManager : MonoBehaviour
         return $"{meters}m";
     }
 
+    // 검색 결과 아이템에서 공통으로 쓰는 라벨을 생성한다.
     TextMeshProUGUI CreateResultLabel(string name, Transform parent, string text,
         float fontSize, FontStyles style, Vector2 offsetMin, Vector2 offsetMax, float height)
     {
@@ -557,6 +586,7 @@ public partial class ARUIManager : MonoBehaviour
         return tmp;
     }
 
+    // 기존 검색 결과 아이템들을 모두 제거한다.
     void ClearSearchResults()
     {
         if (searchResultContainer == null) return;
@@ -566,6 +596,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 길찾기 HUD 전체를 코드로 생성하고 각 상태 위젯을 연결한다.
     void EnsureNavigationHUD()
     {
         if (navigationHUD != null) return;
@@ -714,6 +745,7 @@ public partial class ARUIManager : MonoBehaviour
         navigationHUD.SetActive(false);
     }
 
+    // HUD에서 공통으로 쓰는 텍스트 라벨을 생성한다.
     TextMeshProUGUI CreateHUDText(string name, Transform parent,
         Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
         Vector2 anchoredPos, Vector2 sizeDelta,
@@ -741,12 +773,14 @@ public partial class ARUIManager : MonoBehaviour
         return tmp;
     }
 
+    // 내비 HUD를 표시한다.
     public void ShowNavigationHUD()
     {
         EnsureNavigationHUD();
         navigationHUD.SetActive(true);
     }
 
+    // 내비 HUD와 관련 인디케이터를 모두 숨기고 애니메이션을 정리한다.
     public void HideNavigationHUD()
     {
         if (navigationHUD != null) navigationHUD.SetActive(false);
@@ -760,6 +794,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 남은 총 거리를 HUD 상단 문구 형식으로 갱신한다.
     public void UpdateRemainingDistance(float meters)
     {
         EnsureNavigationHUD();
@@ -770,11 +805,13 @@ public partial class ARUIManager : MonoBehaviour
             remainingDistanceText.text = $"약 {Mathf.RoundToInt(meters)}m";
     }
 
+    // 방향 타입 없이 다음 안내 문구만 갱신하는 편의 오버로드다.
     public void UpdateNextGuide(string guidance, float distance)
     {
         UpdateNextGuide(guidance, distance, 0);
     }
 
+    // 다음 안내 문구와 턴 심볼을 함께 갱신한다.
     public void UpdateNextGuide(string guidance, float distance, int guideType)
     {
         EnsureNavigationHUD();
@@ -801,6 +838,7 @@ public partial class ARUIManager : MonoBehaviour
     }
 
     // TMAP 보행자 길찾기 turnType → 심볼 매핑
+    // TMAP turnType 값을 화면용 방향 심볼로 변환한다.
     string GetTurnSymbol(int type)
     {
         switch (type)
@@ -831,6 +869,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 남은 시간으로 ETA 또는 도착 예정 시각 문구를 계산해 표시한다.
     public void UpdateETA(int remainingSeconds)
     {
         EnsureNavigationHUD();
@@ -852,6 +891,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 진행률 바 채움 비율을 0~1 범위로 갱신한다.
     public void UpdateProgress(float normalized)
     {
         EnsureNavigationHUD();
@@ -859,6 +899,7 @@ public partial class ARUIManager : MonoBehaviour
         _progressFill.fillAmount = Mathf.Clamp01(normalized);
     }
 
+    // 트래킹 불안정 경고 배지를 표시하거나 숨긴다.
     public void SetTrackingWarning(bool show)
     {
         EnsureNavigationHUD();
@@ -866,6 +907,7 @@ public partial class ARUIManager : MonoBehaviour
             _trackingWarningBadge.SetActive(show);
     }
 
+    // 재탐색 인디케이터와 점 애니메이션의 표시 상태를 제어한다.
     public void ShowRerouting(bool show)
     {
         EnsureNavigationHUD();
@@ -882,6 +924,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 재탐색 문구 뒤의 점 개수를 순환시켜 진행 중 느낌을 만든다.
     IEnumerator AnimateReroutingDots()
     {
         TextMeshProUGUI tmp = _reroutingIndicator != null ? _reroutingIndicator.GetComponent<TextMeshProUGUI>() : null;
@@ -896,6 +939,7 @@ public partial class ARUIManager : MonoBehaviour
         }
     }
 
+    // 목적지가 화면 밖일 때 가장자리 방향 인디케이터의 위치와 회전을 계산한다.
     public void UpdateOffScreenIndicator(Vector3 targetWorldPos, Camera cam)
     {
         if (offScreenIndicator == null || cam == null) return;
@@ -944,6 +988,7 @@ public partial class ARUIManager : MonoBehaviour
         offScreenIndicator.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
     }
 
+    // 메인 길찾기 버튼이 없으면 생성하고 NavigationManager 존재도 보장한다.
     void EnsureNavigationButton()
     {
         EnsureNavigationManager();
@@ -961,7 +1006,7 @@ public partial class ARUIManager : MonoBehaviour
         btnRect.anchorMin = new Vector2(1f, 0f);
         btnRect.anchorMax = new Vector2(1f, 0f);
         btnRect.pivot = new Vector2(1f, 0f);
-        btnRect.anchoredPosition = new Vector2(-24f, 200f);
+        btnRect.anchoredPosition = new Vector2(-24f, 140f);
         btnRect.sizeDelta = new Vector2(64f, 64f);
 
         Image btnImage = btnObj.GetComponent<Image>();
@@ -987,6 +1032,193 @@ public partial class ARUIManager : MonoBehaviour
         mainNavigateButton.onClick.AddListener(() => OnNavigateRequested?.Invoke());
     }
 
+    // 가로모드 토글 버튼을 생성하거나 기존 버튼을 재사용한다.
+    void EnsureLandscapeModeButton()
+    {
+        if (landscapeModeButton != null)
+        {
+            landscapeModeButton.gameObject.SetActive(true);
+            SetLandscapeModeButtonState(_isLandscapeModeEnabled);
+            return;
+        }
+
+        GameObject btnObj = new GameObject("LandscapeModeButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(transform, false);
+
+        RectTransform btnRect = btnObj.GetComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(1f, 1f);
+        btnRect.anchorMax = new Vector2(1f, 1f);
+        btnRect.pivot = new Vector2(1f, 1f);
+        btnRect.anchoredPosition = new Vector2(-24f, -24f);
+        btnRect.sizeDelta = new Vector2(120f, 56f);
+
+        Image btnImage = btnObj.GetComponent<Image>();
+        btnImage.color = new Color(0.28f, 0.32f, 0.38f, 0.9f);
+
+        GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI btnText = textObj.GetComponent<TextMeshProUGUI>();
+        btnText.text = "가로모드";
+        btnText.fontSize = 18f;
+        btnText.alignment = TextAlignmentOptions.Center;
+        btnText.color = new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        btnText.raycastTarget = false;
+        ApplySharedTextStyle(btnText);
+
+        landscapeModeButton = btnObj.GetComponent<Button>();
+        landscapeModeButton.onClick.AddListener(() =>
+        {
+            _isLandscapeModeEnabled = !_isLandscapeModeEnabled;
+            ApplyLandscapeScreenOrientation(_isLandscapeModeEnabled);
+            SetLandscapeModeButtonState(_isLandscapeModeEnabled);
+            OnLandscapeModeToggleRequested?.Invoke(_isLandscapeModeEnabled);
+            RefreshFloatingButtonLayout(force: true);
+        });
+
+        SetLandscapeModeButtonState(_isLandscapeModeEnabled);
+    }
+
+    // 디버그 화면과 실제 화면을 즉시 전환하는 토글 버튼을 생성하거나 재사용한다.
+    void EnsureDebugModeButton()
+    {
+        if (debugModeButton != null)
+        {
+            debugModeButton.gameObject.SetActive(true);
+            SetDebugModeButtonState(_isDebugModeEnabled);
+            return;
+        }
+
+        GameObject btnObj = new GameObject("DebugModeButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(transform, false);
+
+        RectTransform btnRect = btnObj.GetComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(1f, 1f);
+        btnRect.anchorMax = new Vector2(1f, 1f);
+        btnRect.pivot = new Vector2(1f, 1f);
+        btnRect.anchoredPosition = new Vector2(-24f, -92f);
+        btnRect.sizeDelta = new Vector2(120f, 56f);
+
+        Image btnImage = btnObj.GetComponent<Image>();
+        btnImage.color = new Color(0.28f, 0.32f, 0.38f, 0.9f);
+
+        GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        textObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI btnText = textObj.GetComponent<TextMeshProUGUI>();
+        btnText.text = "디버그 OFF";
+        btnText.fontSize = 18f;
+        btnText.alignment = TextAlignmentOptions.Center;
+        btnText.color = new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        btnText.raycastTarget = false;
+        ApplySharedTextStyle(btnText);
+
+        debugModeButton = btnObj.GetComponent<Button>();
+        debugModeButton.onClick.AddListener(() =>
+        {
+            _isDebugModeEnabled = !_isDebugModeEnabled;
+            SetDebugModeButtonState(_isDebugModeEnabled);
+            OnDebugModeToggleRequested?.Invoke(_isDebugModeEnabled);
+            RefreshFloatingButtonLayout(force: true);
+        });
+
+        SetDebugModeButtonState(_isDebugModeEnabled);
+    }
+
+    // 가로모드 버튼의 활성 여부를 외부에서 동기화할 수 있게 한다.
+    public void SetLandscapeModeUIState(bool enabled)
+    {
+        _isLandscapeModeEnabled = enabled;
+        ApplyLandscapeScreenOrientation(_isLandscapeModeEnabled);
+        SetLandscapeModeButtonState(_isLandscapeModeEnabled);
+        RefreshFloatingButtonLayout(force: true);
+    }
+
+    // 디버그 모드 토글 UI 상태를 외부에서 동기화한다.
+    public void SetDebugModeUIState(bool enabled)
+    {
+        _isDebugModeEnabled = enabled;
+        SetDebugModeButtonState(_isDebugModeEnabled);
+        RefreshFloatingButtonLayout(force: true);
+    }
+
+    // 가로모드 토글 상태에 따라 화면 방향을 세로 또는 가로로 전환한다.
+    void ApplyLandscapeScreenOrientation(bool enabled)
+    {
+        Screen.orientation = enabled
+            ? ScreenOrientation.LandscapeLeft
+            : ScreenOrientation.Portrait;
+    }
+
+    // 가로모드 버튼의 색상과 문구를 현재 토글 상태에 맞춰 갱신한다.
+    void SetLandscapeModeButtonState(bool enabled)
+    {
+        if (landscapeModeButton == null)
+        {
+            return;
+        }
+
+        Image buttonImage = landscapeModeButton.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.color = enabled
+                ? new Color(0.08f, 0.78f, 0.96f, 1f)
+                : new Color(0.28f, 0.32f, 0.38f, 0.9f);
+        }
+
+        TextMeshProUGUI buttonText = landscapeModeButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (buttonText != null)
+        {
+            buttonText.text = enabled ? "세로 복귀" : "가로모드";
+            buttonText.color = enabled
+                ? Color.white
+                : new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        }
+
+        landscapeModeButton.transform.SetAsLastSibling();
+    }
+
+    // 디버그 버튼의 색상과 문구를 현재 토글 상태에 맞춰 갱신한다.
+    void SetDebugModeButtonState(bool enabled)
+    {
+        if (debugModeButton == null)
+        {
+            return;
+        }
+
+        Image buttonImage = debugModeButton.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.color = enabled
+                ? new Color(0.95f, 0.56f, 0.12f, 1f)
+                : new Color(0.28f, 0.32f, 0.38f, 0.9f);
+        }
+
+        TextMeshProUGUI buttonText = debugModeButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (buttonText != null)
+        {
+            buttonText.text = enabled ? "디버그 ON" : "디버그 OFF";
+            buttonText.color = enabled
+                ? Color.white
+                : new Color(0.82f, 0.86f, 0.9f, 0.9f);
+        }
+
+        debugModeButton.transform.SetAsLastSibling();
+    }
+
+    // 월드 선택 대상의 상세 진입 버튼을 생성하거나 기존 버튼을 재사용한다.
     void EnsureWorldInfoDetailButton()
     {
         if (worldInfoDetailButton != null)
@@ -1002,7 +1234,7 @@ public partial class ARUIManager : MonoBehaviour
         btnRect.anchorMin = new Vector2(0f, 0f);
         btnRect.anchorMax = new Vector2(0f, 0f);
         btnRect.pivot = new Vector2(0f, 0f);
-        btnRect.anchoredPosition = new Vector2(24f, 200f);
+        btnRect.anchoredPosition = new Vector2(24f, 140f);
         btnRect.sizeDelta = new Vector2(128f, 64f);
 
         _worldInfoDetailButtonImage = btnObj.GetComponent<Image>();
@@ -1037,6 +1269,60 @@ public partial class ARUIManager : MonoBehaviour
         SetWorldInfoDetailButtonState(null, false);
     }
 
+    // 화면 방향이 바뀌면 플로팅 버튼 배치를 다시 잡아 버튼이 가려지지 않게 한다.
+    void RefreshFloatingButtonLayout(bool force = false)
+    {
+        if (!force && _lastScreenWidth == Screen.width && _lastScreenHeight == Screen.height)
+        {
+            return;
+        }
+
+        _lastScreenWidth = Screen.width;
+        _lastScreenHeight = Screen.height;
+
+        bool isLandscapeLike = Screen.width > Screen.height;
+        UpdateFloatingButtonRect(landscapeModeButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-24f, -24f), isLandscapeLike ? new Vector2(60f, 30f) : new Vector2(120f, 56f));
+        UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-24f, -92f), isLandscapeLike ? new Vector2(60f, 30f) : new Vector2(120f, 56f));
+        UpdateFloatingButtonRect(mainNavigateButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-24f, -160f), new Vector2(96f, 56f));
+        UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(24f, -24f), new Vector2(128f, 56f));
+
+        if (landscapeModeButton != null)
+        {
+            landscapeModeButton.transform.SetAsLastSibling();
+        }
+
+        if (debugModeButton != null)
+        {
+            debugModeButton.transform.SetAsLastSibling();
+        }
+    }
+
+    // 플로팅 버튼 위치를 공통 방식으로 갱신한다.
+    void UpdateFloatingButtonRect(Button button, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 size)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        RectTransform rect = button.GetComponent<RectTransform>();
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = size;
+    }
+
+    // 씬에 NavigationManager가 없을 때만 자동 생성한다.
     void EnsureNavigationManager()
     {
         if (FindFirstObjectByType<NavigationManager>() != null) return;
@@ -1046,6 +1332,7 @@ public partial class ARUIManager : MonoBehaviour
         Debug.Log("[ARUIManager] NavigationManager를 자동 생성했습니다.");
     }
 
+    // 내비 모드 진입 시 일반 상태 카드와 진입 버튼을 숨긴다.
     public void EnterNavigationMode()
     {
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
@@ -1054,6 +1341,7 @@ public partial class ARUIManager : MonoBehaviour
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
     }
 
+    // 내비 모드 종료 시 HUD를 정리하고 기본 스캔 상태 UI로 복귀한다.
     public void ExitNavigationMode()
     {
         HideNavigationHUD();
@@ -1065,10 +1353,14 @@ public partial class ARUIManager : MonoBehaviour
     #endregion
 
     #region Animations
+    // 카드를 활성화한 뒤 지정 위치와 알파로 슬라이드 인시킨다.
     void ShowCard(GameObject obj, RectTransform rect, CanvasGroup group, float targetY, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); obj.SetActive(true); routine = StartCoroutine(AnimateMove(rect, group, targetY, 1)); }
+    // 카드를 화면 아래로 슬라이드 아웃시키고 완료 후 비활성화한다.
     void HideCard(GameObject obj, RectTransform rect, CanvasGroup group, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); routine = StartCoroutine(AnimateMove(rect, group, slideOffset, 0, () => obj.SetActive(false))); }
+    // 카드의 시작 위치와 투명도를 표시 여부에 맞게 즉시 세팅한다.
     void InitializeCard(RectTransform rect, CanvasGroup group, bool visible, float targetY) { if (visible) { rect.anchoredPosition = new Vector2(0, targetY); group.alpha = 1; } else { rect.anchoredPosition = new Vector2(0, slideOffset); group.alpha = 0; } }
-    
+
+    // 카드 위치와 알파를 부드럽게 보간해 상태 전환 애니메이션을 수행한다.
     IEnumerator AnimateMove(RectTransform rect, CanvasGroup group, float targetY, float targetAlpha, Action onComplete = null) { float startY = rect.anchoredPosition.y; float startAlpha = group.alpha; float time = 0; while (time < animDuration) { time += Time.deltaTime; float t = time / animDuration; t = t * t * (3f - 2f * t); Vector2 pos = rect.anchoredPosition; pos.y = Mathf.Lerp(startY, targetY, t); rect.anchoredPosition = pos; group.alpha = Mathf.Lerp(startAlpha, targetAlpha, t); yield return null; } rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, targetY); group.alpha = targetAlpha; onComplete?.Invoke(); }
     #endregion
 }
