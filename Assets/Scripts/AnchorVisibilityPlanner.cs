@@ -97,8 +97,14 @@ public static class AnchorVisibilityPlanner
             float signedHeadingDelta = Mathf.DeltaAngle(
                 (float)pose.Heading,
                 (float)CalculateBearingDegrees(pose.Latitude, pose.Longitude, building.latitude, building.longitude));
-            float normalizedOffset = signedHeadingDelta / Mathf.Max(1f, detectionAngle);
-            float viewportX = 0.5f + Mathf.Clamp(normalizedOffset, -0.5f, 0.5f);
+            float halfDetectionAngle = Mathf.Max(0.5f, detectionAngle * 0.5f);
+            if (Mathf.Abs(signedHeadingDelta) > halfDetectionAngle)
+            {
+                continue;
+            }
+
+            float normalizedOffset = Mathf.Clamp(signedHeadingDelta / halfDetectionAngle, -1f, 1f);
+            float viewportX = 0.5f + (normalizedOffset * 0.5f);
 
             if (viewportX < 0f || viewportX > 1f)
             {

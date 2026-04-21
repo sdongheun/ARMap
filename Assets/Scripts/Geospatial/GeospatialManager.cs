@@ -279,7 +279,9 @@ public partial class GeospatialManager : MonoBehaviour
             detectionRadius = landscapeDetectionRadius;
             detectionAngle = landscapeDetectionAngle;
             maxPreviewAnchors = landscapeMaxPreviewAnchors;
-            centerViewportThreshold = landscapeCenterViewportThreshold;
+            // 가로모드에서도 중앙 건물을 바라볼 때는 세로모드와 동일하게 focusedBuilding 이 잘 잡혀야
+            // 상태 배지가 숨겨지고 선택 텍스트가 자연스럽게 유지된다.
+            centerViewportThreshold = Mathf.Max(landscapeCenterViewportThreshold, _portraitCenterViewportThreshold);
             forwardGroupViewportThreshold = landscapeForwardGroupViewportThreshold;
             return;
         }
@@ -1125,7 +1127,7 @@ public partial class GeospatialManager : MonoBehaviour
         _currentActiveMarker = null;
         _lastDetectionDebugSignature = string.Empty;
         _lastAnchorPoolSignature = string.Empty;
-        arUIManager?.SetScanningMode();
+        arUIManager?.SetTrackingStabilizingMode();
     }
 }
 

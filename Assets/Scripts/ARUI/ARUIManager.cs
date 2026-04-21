@@ -63,6 +63,12 @@ public partial class ARUIManager : MonoBehaviour
     public float centerReticlePulseAlphaMin = 0.32f;
     public float centerReticlePulseAlphaMax = 0.72f;
     public float centerReticlePulseScale = 1.04f;
+    [Header("10. Status Badge")]
+    public Vector2 statusBadgeSize = new Vector2(260f, 60f);
+    public Vector2 statusBadgeTopOffset = new Vector2(0f, -48f);
+    [Header("11. Action Bar Style")]
+    public int bottomActionBarCornerRadius = 14;
+    public int bottomActionBarSpriteSize = 64;
 
     // --- Internal Variables ---
     public event Action OnDetailOpened;
@@ -105,6 +111,15 @@ public partial class ARUIManager : MonoBehaviour
     private RectTransform _canvasRect;
     private Canvas _canvas;
     private RectTransform _centerReticleRoot;
+    private RectTransform _statusBadgeRoot;
+    private Image _statusBadgeBackground;
+    private TextMeshProUGUI _statusBadgeText;
+    private CanvasGroup _statusBadgeGroup;
+    private Coroutine _statusBadgeRoutine;
+    private RectTransform _bottomActionBarRoot;
+    private HorizontalLayoutGroup _bottomActionBarLayout;
+    private Image _bottomActionBarBackground;
+    private Sprite _bottomActionBarRoundedSprite;
     private RectTransform _debugOverlayRoot;
     private ScrollRect _debugOverlayScrollRect;
     private RectTransform _debugOverlayContent;
@@ -120,8 +135,16 @@ public partial class ARUIManager : MonoBehaviour
     // 상태 카드와 캔버스 관련 참조를 미리 캐시한다.
     void Awake()
     {
-        _scanRect = scanningCard.GetComponent<RectTransform>(); _scanGroup = scanningCard.GetComponent<CanvasGroup>();
-        _detectRect = detectedCard.GetComponent<RectTransform>(); _detectGroup = detectedCard.GetComponent<CanvasGroup>();
+        if (scanningCard != null)
+        {
+            _scanRect = scanningCard.GetComponent<RectTransform>();
+            _scanGroup = scanningCard.GetComponent<CanvasGroup>();
+        }
+        if (detectedCard != null)
+        {
+            _detectRect = detectedCard.GetComponent<RectTransform>();
+            _detectGroup = detectedCard.GetComponent<CanvasGroup>();
+        }
         _canvasRect = GetComponent<RectTransform>();
         _canvas = GetComponent<Canvas>();
     }
@@ -152,8 +175,10 @@ public partial class ARUIManager : MonoBehaviour
         BindStopNavigationButton();
         BindRecalibrateButton();
 
-        InitializeCard(_scanRect, _scanGroup, true, statusCardPosY);
+        InitializeCard(_scanRect, _scanGroup, false, statusCardPosY);
         InitializeCard(_detectRect, _detectGroup, false, statusCardPosY);
+        EnsureStatusBadge();
+        SetStatusBadgeMessage("주변을 바라보세요");
 
         if (navigationSearchPanel != null) navigationSearchPanel.SetActive(false);
         if (navigationHUD != null) navigationHUD.SetActive(false);
@@ -163,6 +188,7 @@ public partial class ARUIManager : MonoBehaviour
         EnsureWorldInfoDetailButton();
         EnsureLandscapeModeButton();
         EnsureDebugModeButton();
+        EnsureBottomActionBar();
         RefreshFloatingButtonLayout(force: true);
         EnsureCenterReticle();
     }
@@ -171,6 +197,7 @@ public partial class ARUIManager : MonoBehaviour
     void Update()
     {
         RefreshFloatingButtonLayout();
+        RefreshStatusBadgeLayout();
         UpdateCenterReticleAnimation();
     }
 
@@ -1281,14 +1308,104 @@ public partial class ARUIManager : MonoBehaviour
         _lastScreenHeight = Screen.height;
 
         bool isLandscapeLike = Screen.width > Screen.height;
-        UpdateFloatingButtonRect(landscapeModeButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-            new Vector2(-24f, -24f), isLandscapeLike ? new Vector2(60f, 30f) : new Vector2(120f, 56f));
-        UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-            new Vector2(-24f, -92f), isLandscapeLike ? new Vector2(60f, 30f) : new Vector2(120f, 56f));
-        UpdateFloatingButtonRect(mainNavigateButton, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-            new Vector2(-24f, -160f), new Vector2(96f, 56f));
-        UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(24f, -24f), new Vector2(128f, 56f));
+        EnsureBottomActionBar();
+        if (isLandscapeLike)
+        {
+            Vector2 sideButtonSize = new Vector2(50f, 20f);
+            float bottomInset = 18f;
+
+            if (mainNavigateButton != null)
+            {
+                if (mainNavigateButton.transform.parent != _bottomActionBarRoot)
+                {
+                    mainNavigateButton.transform.SetParent(_bottomActionBarRoot, false);
+                }
+                mainNavigateButton.gameObject.SetActive(false);
+            }
+
+            if (landscapeModeButton != null && landscapeModeButton.transform.parent != _bottomActionBarRoot)
+            {
+                landscapeModeButton.transform.SetParent(_bottomActionBarRoot, false);
+            }
+
+            if (worldInfoDetailButton != null && worldInfoDetailButton.transform.parent != _bottomActionBarRoot)
+            {
+                worldInfoDetailButton.transform.SetParent(_bottomActionBarRoot, false);
+            }
+
+            if (_bottomActionBarRoot != null)
+            {
+                float barWidth = (sideButtonSize.x * 2f) + 10f + 24f;
+                float barHeight = sideButtonSize.y + 20f;
+                _bottomActionBarRoot.gameObject.SetActive(true);
+                _bottomActionBarRoot.anchorMin = new Vector2(1f, 0f);
+                _bottomActionBarRoot.anchorMax = new Vector2(1f, 0f);
+                _bottomActionBarRoot.pivot = new Vector2(1f, 0f);
+                _bottomActionBarRoot.anchoredPosition = new Vector2(-24f, bottomInset);
+                _bottomActionBarRoot.sizeDelta = new Vector2(barWidth, barHeight);
+                _bottomActionBarRoot.SetAsLastSibling();
+            }
+
+            UpdateFloatingButtonRect(landscapeModeButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                Vector2.zero, sideButtonSize);
+            UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                Vector2.zero, sideButtonSize);
+
+            UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-24f, bottomInset + sideButtonSize.y + 10f), new Vector2(96f, 40f));
+
+            SetButtonTextSize(landscapeModeButton, 9f);
+            SetButtonTextSize(worldInfoDetailButton, 9f);
+        }
+        else
+        {
+            Vector2 barButtonSize = new Vector2(104f, 48f);
+            float bottomInset = 24f;
+            float barWidth = (barButtonSize.x * 3f) + (10f * 2f) + 24f;
+            float barHeight = 68f;
+
+            if (mainNavigateButton != null)
+            {
+                if (mainNavigateButton.transform.parent != _bottomActionBarRoot)
+                {
+                    mainNavigateButton.transform.SetParent(_bottomActionBarRoot, false);
+                }
+                mainNavigateButton.gameObject.SetActive(true);
+            }
+
+            if (landscapeModeButton != null && landscapeModeButton.transform.parent != _bottomActionBarRoot)
+            {
+                landscapeModeButton.transform.SetParent(_bottomActionBarRoot, false);
+            }
+
+            if (worldInfoDetailButton != null && worldInfoDetailButton.transform.parent != _bottomActionBarRoot)
+            {
+                worldInfoDetailButton.transform.SetParent(_bottomActionBarRoot, false);
+            }
+
+            if (_bottomActionBarRoot != null)
+            {
+                _bottomActionBarRoot.gameObject.SetActive(true);
+                _bottomActionBarRoot.anchorMin = new Vector2(0.5f, 0f);
+                _bottomActionBarRoot.anchorMax = new Vector2(0.5f, 0f);
+                _bottomActionBarRoot.pivot = new Vector2(0.5f, 0f);
+                _bottomActionBarRoot.anchoredPosition = new Vector2(0f, bottomInset);
+                _bottomActionBarRoot.sizeDelta = new Vector2(barWidth, barHeight);
+            }
+
+            UpdateFloatingButtonRect(mainNavigateButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                Vector2.zero, barButtonSize);
+            UpdateFloatingButtonRect(landscapeModeButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                Vector2.zero, barButtonSize);
+            UpdateFloatingButtonRect(worldInfoDetailButton, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                Vector2.zero, barButtonSize);
+
+            UpdateFloatingButtonRect(debugModeButton, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-24f, bottomInset + barButtonSize.y + 12f), new Vector2(120f, 56f));
+
+            SetButtonTextSize(landscapeModeButton, 18f);
+            SetButtonTextSize(worldInfoDetailButton, 18f);
+        }
 
         if (landscapeModeButton != null)
         {
@@ -1322,6 +1439,99 @@ public partial class ARUIManager : MonoBehaviour
         rect.sizeDelta = size;
     }
 
+    // 버튼 내부 TMP 텍스트 크기를 현재 레이아웃에 맞게 조정한다.
+    void SetButtonTextSize(Button button, float fontSize)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
+        if (buttonText == null)
+        {
+            return;
+        }
+
+        buttonText.fontSize = fontSize;
+    }
+
+    // 세로모드에서 3개 버튼을 담는 둥근 플로팅 바를 생성한다.
+    void EnsureBottomActionBar()
+    {
+        if (_bottomActionBarRoot != null)
+        {
+            return;
+        }
+
+        GameObject rootObject = new GameObject("BottomActionBar", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+        rootObject.transform.SetParent(transform, false);
+
+        _bottomActionBarRoot = rootObject.GetComponent<RectTransform>();
+        _bottomActionBarBackground = rootObject.GetComponent<Image>();
+        _bottomActionBarLayout = rootObject.GetComponent<HorizontalLayoutGroup>();
+
+        _bottomActionBarRoundedSprite = CreateRoundedRectSprite(
+            Mathf.Max(16, bottomActionBarSpriteSize),
+            Mathf.Clamp(bottomActionBarCornerRadius, 2, Mathf.Max(4, bottomActionBarSpriteSize / 2)));
+        _bottomActionBarBackground.sprite = _bottomActionBarRoundedSprite;
+        _bottomActionBarBackground.type = _bottomActionBarRoundedSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        _bottomActionBarBackground.color = new Color(0.07f, 0.10f, 0.15f, 0.88f);
+        _bottomActionBarBackground.raycastTarget = false;
+
+        _bottomActionBarLayout.spacing = 10f;
+        _bottomActionBarLayout.padding = new RectOffset(12, 12, 10, 10);
+        _bottomActionBarLayout.childAlignment = TextAnchor.MiddleCenter;
+        _bottomActionBarLayout.childControlWidth = false;
+        _bottomActionBarLayout.childControlHeight = false;
+        _bottomActionBarLayout.childForceExpandWidth = false;
+        _bottomActionBarLayout.childForceExpandHeight = false;
+    }
+
+    // 지정한 radius를 가진 rounded rectangle 9-slice 스프라이트를 런타임에 만든다.
+    Sprite CreateRoundedRectSprite(int textureSize, int radius)
+    {
+        Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
+        texture.name = "BottomActionBarRoundedSprite";
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Color32[] pixels = new Color32[textureSize * textureSize];
+        Color32 clear = new Color32(255, 255, 255, 0);
+        Color32 fill = new Color32(255, 255, 255, 255);
+        Vector2 centerOffset = new Vector2(textureSize * 0.5f, textureSize * 0.5f);
+        float halfSize = textureSize * 0.5f;
+        float innerHalf = Mathf.Max(0f, halfSize - radius);
+        float radiusSq = radius * radius;
+
+        for (int y = 0; y < textureSize; y++)
+        {
+            for (int x = 0; x < textureSize; x++)
+            {
+                float localX = Mathf.Abs((x + 0.5f) - centerOffset.x);
+                float localY = Mathf.Abs((y + 0.5f) - centerOffset.y);
+
+                bool insideCore = localX <= innerHalf || localY <= innerHalf;
+                bool insideCorner = false;
+
+                if (!insideCore)
+                {
+                    float dx = localX - innerHalf;
+                    float dy = localY - innerHalf;
+                    insideCorner = (dx * dx) + (dy * dy) <= radiusSq;
+                }
+
+                pixels[y * textureSize + x] = (insideCore || insideCorner) ? fill : clear;
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply(false, false);
+
+        Vector4 border = new Vector4(radius, radius, radius, radius);
+        return Sprite.Create(texture, new Rect(0, 0, textureSize, textureSize), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, border);
+    }
+
     // 씬에 NavigationManager가 없을 때만 자동 생성한다.
     void EnsureNavigationManager()
     {
@@ -1337,6 +1547,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
+        SetStatusBadgeMessage(null);
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
     }
@@ -1354,11 +1565,11 @@ public partial class ARUIManager : MonoBehaviour
 
     #region Animations
     // 카드를 활성화한 뒤 지정 위치와 알파로 슬라이드 인시킨다.
-    void ShowCard(GameObject obj, RectTransform rect, CanvasGroup group, float targetY, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); obj.SetActive(true); routine = StartCoroutine(AnimateMove(rect, group, targetY, 1)); }
+    void ShowCard(GameObject obj, RectTransform rect, CanvasGroup group, float targetY, ref Coroutine routine) { if (obj == null || rect == null || group == null) return; if (routine != null) StopCoroutine(routine); obj.SetActive(true); routine = StartCoroutine(AnimateMove(rect, group, targetY, 1)); }
     // 카드를 화면 아래로 슬라이드 아웃시키고 완료 후 비활성화한다.
-    void HideCard(GameObject obj, RectTransform rect, CanvasGroup group, ref Coroutine routine) { if (routine != null) StopCoroutine(routine); routine = StartCoroutine(AnimateMove(rect, group, slideOffset, 0, () => obj.SetActive(false))); }
+    void HideCard(GameObject obj, RectTransform rect, CanvasGroup group, ref Coroutine routine) { if (obj == null || rect == null || group == null) return; if (routine != null) StopCoroutine(routine); routine = StartCoroutine(AnimateMove(rect, group, slideOffset, 0, () => obj.SetActive(false))); }
     // 카드의 시작 위치와 투명도를 표시 여부에 맞게 즉시 세팅한다.
-    void InitializeCard(RectTransform rect, CanvasGroup group, bool visible, float targetY) { if (visible) { rect.anchoredPosition = new Vector2(0, targetY); group.alpha = 1; } else { rect.anchoredPosition = new Vector2(0, slideOffset); group.alpha = 0; } }
+    void InitializeCard(RectTransform rect, CanvasGroup group, bool visible, float targetY) { if (rect == null || group == null) return; if (visible) { rect.anchoredPosition = new Vector2(0, targetY); group.alpha = 1; } else { rect.anchoredPosition = new Vector2(0, slideOffset); group.alpha = 0; } }
 
     // 카드 위치와 알파를 부드럽게 보간해 상태 전환 애니메이션을 수행한다.
     IEnumerator AnimateMove(RectTransform rect, CanvasGroup group, float targetY, float targetAlpha, Action onComplete = null) { float startY = rect.anchoredPosition.y; float startAlpha = group.alpha; float time = 0; while (time < animDuration) { time += Time.deltaTime; float t = time / animDuration; t = t * t * (3f - 2f * t); Vector2 pos = rect.anchoredPosition; pos.y = Mathf.Lerp(startY, targetY, t); rect.anchoredPosition = pos; group.alpha = Mathf.Lerp(startAlpha, targetAlpha, t); yield return null; } rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, targetY); group.alpha = targetAlpha; onComplete?.Invoke(); }
