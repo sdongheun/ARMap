@@ -1030,6 +1030,11 @@ public class NavigationManager : MonoBehaviour
     {
         ClearDestinationMarker();
 
+        if (geospatialManager != null && geospatialManager.ShowNavigationTargetMarker(lat, lon, name))
+        {
+            return;
+        }
+
         Vector3 worldPos = GeoToWorldPosition(lat, lon);
         worldPos.y += 3.0f;
 
@@ -1118,6 +1123,8 @@ public class NavigationManager : MonoBehaviour
 
     void ClearDestinationMarker()
     {
+        geospatialManager?.ClearNavigationTargetMarker();
+
         if (_destinationMarkerInstance != null)
         {
             Destroy(_destinationMarkerInstance);

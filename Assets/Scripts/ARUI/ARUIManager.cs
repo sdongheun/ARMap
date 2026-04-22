@@ -152,6 +152,8 @@ public partial class ARUIManager : MonoBehaviour
     // 시작 시 상세 패널, 버튼, 카드 초기 상태를 한 번에 연결한다.
     void Start()
     {
+        EnsureNavigationManager();
+
         if (uiToolkitDetailPanel != null)
         {
             uiToolkitDetailPanel.OnClosed += HandleUIToolkitDetailClosed;
@@ -160,13 +162,13 @@ public partial class ARUIManager : MonoBehaviour
         }
 
         if (mainNavigateButton != null)
-            mainNavigateButton.onClick.AddListener(() => OnNavigateRequested?.Invoke());
+            mainNavigateButton.onClick.AddListener(DispatchNavigateRequested);
         if (detailNavigateButton != null)
             detailNavigateButton.onClick.AddListener(() =>
             {
                 if (_currentDetailData != null)
                 {
-                    OnNavigateFromDetailRequested?.Invoke(_currentDetailData);
+                    DispatchNavigateFromDetailRequested(_currentDetailData);
                 }
             });
         if (closeSearchButton != null)
@@ -459,6 +461,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         EnsureSearchPanel();
         navigationSearchPanel.SetActive(true);
+        BringNavigationSurfaceToFront(navigationSearchPanel.transform);
         if (destinationInputField != null)
         {
             destinationInputField.text = "";
@@ -802,6 +805,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         EnsureNavigationHUD();
         navigationHUD.SetActive(true);
+        BringNavigationSurfaceToFront(navigationHUD.transform);
     }
 
     // 내비 HUD와 관련 인디케이터를 모두 숨기고 애니메이션을 정리한다.
@@ -1053,7 +1057,24 @@ public partial class ARUIManager : MonoBehaviour
         ApplySharedTextStyle(btnText);
 
         mainNavigateButton = btnObj.GetComponent<Button>();
-        mainNavigateButton.onClick.AddListener(() => OnNavigateRequested?.Invoke());
+        mainNavigateButton.onClick.AddListener(DispatchNavigateRequested);
+    }
+
+    void DispatchNavigateRequested()
+    {
+        EnsureNavigationManager();
+        OnNavigateRequested?.Invoke();
+    }
+
+    void DispatchNavigateFromDetailRequested(BuildingData building)
+    {
+        if (building == null)
+        {
+            return;
+        }
+
+        EnsureNavigationManager();
+        OnNavigateFromDetailRequested?.Invoke(building);
     }
 
     // 가로모드 토글 버튼을 생성하거나 기존 버튼을 재사용한다.
@@ -1431,10 +1452,20 @@ public partial class ARUIManager : MonoBehaviour
         SetStatusBadgeMessage(null);
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
+        if (landscapeModeButton != null) landscapeModeButton.gameObject.SetActive(false);
         _toolkitBottomBarNavigationMode = true;
         if (_toolkitNavigateButton != null) _toolkitNavigateButton.style.display = UnityEngine.UIElements.DisplayStyle.None;
         if (_toolkitDetailButton != null) _toolkitDetailButton.style.display = UnityEngine.UIElements.DisplayStyle.None;
+        SetBottomActionBarToolkitVisible(false);
         RefreshBottomActionBarToolkitLayout();
+        if (navigationSearchPanel != null && navigationSearchPanel.activeSelf)
+        {
+            BringNavigationSurfaceToFront(navigationSearchPanel.transform);
+        }
+        if (navigationHUD != null && navigationHUD.activeSelf)
+        {
+            BringNavigationSurfaceToFront(navigationHUD.transform);
+        }
     }
 
     // 내비 모드 종료 시 HUD를 정리하고 기본 스캔 상태 UI로 복귀한다.
@@ -1445,10 +1476,31 @@ public partial class ARUIManager : MonoBehaviour
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(true);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(true);
         _toolkitBottomBarNavigationMode = false;
+        SetBottomActionBarToolkitVisible(true);
         if (_toolkitNavigateButton != null) _toolkitNavigateButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
         if (_toolkitDetailButton != null) _toolkitDetailButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
         RefreshBottomActionBarToolkitLayout();
         SetScanningMode();
+    }
+
+    void BringNavigationSurfaceToFront(Transform navigationSurface)
+    {
+        if (navigationSurface == null)
+        {
+            return;
+        }
+
+        if (_statusBadgeRoot != null)
+        {
+            _statusBadgeRoot.SetAsFirstSibling();
+        }
+
+        navigationSurface.SetAsLastSibling();
+
+        if (offScreenIndicator != null && offScreenIndicator.gameObject.activeSelf)
+        {
+            offScreenIndicator.SetAsLastSibling();
+        }
     }
     #endregion
 
