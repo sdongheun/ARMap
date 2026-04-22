@@ -32,6 +32,7 @@ public partial class ARUIManager
     private UITKButton _toolkitDetailButton;
     private bool _toolkitDetailButtonEnabled;
     private bool _toolkitBottomBarNavigationMode;
+    private bool _toolkitBottomBarVisible = true;
 
     // UI Toolkit 기반 하단 액션바 문서를 생성하고 버튼을 구성한다.
     void EnsureBottomActionBarToolkit()
@@ -86,7 +87,7 @@ public partial class ARUIManager
         _bottomBarToolkitBar.style.paddingRight = ToolkitPortraitBarPaddingHorizontal;
         _bottomBarToolkitBar.style.paddingTop = ToolkitPortraitBarPaddingVertical;
         _bottomBarToolkitBar.style.paddingBottom = ToolkitPortraitBarPaddingVertical;
-        _toolkitNavigateButton = CreateToolkitActionButton("길찾기", () => OnNavigateRequested?.Invoke());
+        _toolkitNavigateButton = CreateToolkitActionButton("길찾기", DispatchNavigateRequested);
         _toolkitLandscapeButton = CreateToolkitActionButton("가로모드", OnToolkitLandscapeButtonClicked);
         _toolkitDetailButton = CreateToolkitActionButton("상세정보", OnToolkitDetailButtonClicked);
 
@@ -149,7 +150,7 @@ public partial class ARUIManager
         _bottomBarToolkitRoot.style.paddingRight = 0f;
         _bottomBarToolkitRoot.style.alignItems = Align.Center;
 
-        _bottomBarToolkitBar.style.display = DisplayStyle.Flex;
+        _bottomBarToolkitBar.style.display = _toolkitBottomBarVisible ? DisplayStyle.Flex : DisplayStyle.None;
         _bottomBarToolkitBar.style.marginBottom = 0f;
         _bottomBarToolkitBar.style.left = StyleKeyword.Null;
         _bottomBarToolkitBar.style.right = StyleKeyword.Null;
@@ -172,6 +173,11 @@ public partial class ARUIManager
                 _toolkitNavigateButton.style.display = DisplayStyle.None;
             }
 
+            if (_toolkitLandscapeButton != null)
+            {
+                _toolkitLandscapeButton.style.display = DisplayStyle.None;
+            }
+
             ApplyToolkitButtonSize(_toolkitLandscapeButton, ToolkitLandscapeButtonWidth, ToolkitLandscapeButtonHeight, ToolkitLandscapeButtonFontSize, ToolkitLandscapeButtonCornerRadius);
             ApplyToolkitButtonSize(_toolkitDetailButton, ToolkitLandscapeButtonWidth, ToolkitLandscapeButtonHeight, ToolkitLandscapeButtonFontSize, ToolkitLandscapeButtonCornerRadius);
         }
@@ -190,6 +196,11 @@ public partial class ARUIManager
             if (_toolkitNavigateButton != null)
             {
                 _toolkitNavigateButton.style.display = _toolkitBottomBarNavigationMode ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+
+            if (_toolkitLandscapeButton != null)
+            {
+                _toolkitLandscapeButton.style.display = _toolkitBottomBarNavigationMode ? DisplayStyle.None : DisplayStyle.Flex;
             }
 
             ApplyToolkitButtonSize(_toolkitNavigateButton, ToolkitPortraitButtonWidth, ToolkitPortraitButtonHeight, ToolkitPortraitButtonFontSize, ToolkitPortraitButtonCornerRadius);
@@ -215,6 +226,7 @@ public partial class ARUIManager
             return;
         }
 
+        _toolkitBottomBarVisible = visible;
         _bottomBarToolkitBar.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
