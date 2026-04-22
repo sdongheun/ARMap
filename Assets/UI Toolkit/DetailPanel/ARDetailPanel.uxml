@@ -23,9 +23,21 @@
                         <ui:VisualElement class="field-icon field-icon-address row-icon-image" />
                         <ui:VisualElement class="row-body row-body-wide">
                             <ui:Label text="주소" class="row-label" />
-                            <ui:VisualElement class="row-inline">
-                                <ui:Label name="detail-address-value" text="주소 정보가 없습니다." class="row-value multiline-value inline-value" />
-                                <ui:Button name="address-copy-button" text="복사" class="inline-text-button" />
+                            <ui:VisualElement class="address-stack">
+                                <ui:VisualElement name="lot-address-group" class="address-group">
+                                    <ui:VisualElement class="row-inline address-inline">
+                                        <ui:Label text="지번 주소" class="address-kind-label" />
+                                        <ui:Button name="lot-address-copy-button" text="복사" class="inline-text-button" />
+                                    </ui:VisualElement>
+                                    <ui:Label name="detail-lot-address-value" text="지번 주소 정보가 없습니다." class="row-value multiline-value" />
+                                </ui:VisualElement>
+                                <ui:VisualElement name="road-address-group" class="address-group">
+                                    <ui:VisualElement class="row-inline address-inline">
+                                        <ui:Label text="도로명 주소" class="address-kind-label" />
+                                        <ui:Button name="road-address-copy-button" text="복사" class="inline-text-button" />
+                                    </ui:VisualElement>
+                                    <ui:Label name="detail-road-address-value" text="도로명 주소 정보가 없습니다." class="row-value multiline-value" />
+                                </ui:VisualElement>
                             </ui:VisualElement>
                         </ui:VisualElement>
                     </ui:VisualElement>
@@ -44,6 +56,9 @@
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:ScrollView>
+        </ui:VisualElement>
+        <ui:VisualElement name="copy-toast" class="copy-toast">
+            <ui:Label name="copy-toast-label" text="복사되었습니다." class="copy-toast-label" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

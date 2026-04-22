@@ -19,6 +19,41 @@
     background-color: white;
 }
 
+.copy-toast {
+    position: absolute;
+    top: 56px;
+    left: 24px;
+    right: 24px;
+    opacity: 0;
+    align-items: center;
+    justify-content: center;
+    transition-property: opacity, translate;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-out;
+    translate: 0 -10px;
+}
+
+.copy-toast--visible {
+    opacity: 1;
+    translate: 0 0;
+}
+
+.copy-toast-label {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+    background-color: rgba(21, 20, 18, 0.92);
+    color: white;
+    font-size: 6px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
 .sheet {
     width: 100%;
     height: 100%;
@@ -282,8 +317,7 @@
     border-top-right-radius: 16px;
     border-bottom-left-radius: 16px;
     border-bottom-right-radius: 16px;
-    unity-background-image-tint-color: white;
-    box-shadow: 0 10px 22px rgba(185, 164, 0, 0.22);
+    -unity-background-image-tint-color: white;
 }
 
 .map-open-button:disabled {
@@ -325,7 +359,6 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
     min-width: 0;
 }
 
@@ -353,11 +386,38 @@
     min-width: 0;
 }
 
+.address-stack {
+    display: flex;
+    flex-direction: column;
+    margin-top: 2px;
+}
+
+.address-group {
+    display: flex;
+    flex-direction: column;
+}
+
+#road-address-group {
+    margin-top: 10px;
+}
+
+.address-inline {
+    margin-bottom: 0;
+}
+
+.address-kind-label {
+    flex-grow: 1;
+    min-width: 0;
+    font-size: 5px;
+    color: rgb(134, 127, 119);
+}
+
 .inline-text-button {
     height: auto;
     min-width: auto;
     flex-shrink: 0;
     align-self: center;
+    margin-left: 8px;
     background-color: rgba(255, 255, 255, 0);
     color: rgb(131, 125, 118);
     font-size: 6px;
@@ -369,7 +429,6 @@
     padding-right: 0;
     padding-top: 0;
     padding-bottom: 0;
-    text-decoration: underline;
 }
 
 .field-icon {

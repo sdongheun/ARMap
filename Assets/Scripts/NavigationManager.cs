@@ -1048,7 +1048,7 @@ public class NavigationManager : MonoBehaviour
         if (marker != null)
         {
             marker.SetState(BuildingMarker.MarkerVisualState.Selected);
-            marker.SetInfoContent(name, "목적지");
+            marker.SetInfoContent(name, "목적지", string.Empty);
             marker.SetInfoVisible(true);
         }
     }

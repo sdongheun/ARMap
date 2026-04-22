@@ -15,8 +15,6 @@ public class ARDetailPanelDocumentController : MonoBehaviour
 
     public event Action OnClosed;
     public event Action OnPhoneRequested;
-    public event Action OnCopyRequested;
-    public event Action OnShareRequested;
     public event Action OnMapRequested;
 
     public bool IsVisible => _isVisible;
@@ -28,17 +26,6 @@ public class ARDetailPanelDocumentController : MonoBehaviour
             return option != null
                 ? (option.name ?? string.Empty)
                 : (_currentData?.buildingName ?? string.Empty);
-        }
-    }
-
-    public string CurrentDisplayedCategory
-    {
-        get
-        {
-            DetailPlaceOption option = GetCurrentPlaceOption();
-            return option != null
-                ? (option.category ?? string.Empty)
-                : (_currentData?.description ?? string.Empty);
         }
     }
 
@@ -64,6 +51,55 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         }
     }
 
+    public string CurrentDisplayedAddress
+    {
+        get
+        {
+            if (_currentData == null)
+            {
+                return string.Empty;
+            }
+
+            string lotNumberAddress = CurrentDisplayedLotNumberAddress;
+            string roadAddress = CurrentDisplayedRoadAddress;
+
+            if (!string.IsNullOrWhiteSpace(lotNumberAddress) && !string.IsNullOrWhiteSpace(roadAddress))
+            {
+                return $"{lotNumberAddress}\n{roadAddress}";
+            }
+
+            return !string.IsNullOrWhiteSpace(lotNumberAddress)
+                ? lotNumberAddress
+                : roadAddress;
+        }
+    }
+
+    public string CurrentDisplayedLotNumberAddress
+    {
+        get
+        {
+            if (_currentData == null)
+            {
+                return string.Empty;
+            }
+
+            return BuildLotNumberAddress(_currentData);
+        }
+    }
+
+    public string CurrentDisplayedRoadAddress
+    {
+        get
+        {
+            if (_currentData == null)
+            {
+                return string.Empty;
+            }
+
+            return BuildRoadAddress(_currentData);
+        }
+    }
+
     private UIDocument _uiDocument;
     private VisualElement _root;
     private VisualElement _overlay;
@@ -72,16 +108,22 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     private VisualElement _facilityToggleButton;
     private ScrollView _facilityList;
     private VisualElement _addressRow;
+    private VisualElement _lotAddressGroup;
+    private VisualElement _roadAddressGroup;
     private VisualElement _phoneRow;
     private VisualElement _mapActionRow;
+    private VisualElement _copyToast;
     private Label _titleLabel;
     private Label _subtitleLabel;
     private Label _facilityToggleLabel;
     private Label _facilitySelectedNameLabel;
-    private Label _addressLabel;
+    private Label _lotAddressLabel;
+    private Label _roadAddressLabel;
     private Label _phoneLabel;
+    private Label _copyToastLabel;
     private Button _closeButton;
-    private Button _addressCopyButton;
+    private Button _lotAddressCopyButton;
+    private Button _roadAddressCopyButton;
     private Button _phoneCallButton;
     private Button _mapOpenButton;
     private VisualElement _facilityToggleChevronIcon;
@@ -91,6 +133,7 @@ public class ARDetailPanelDocumentController : MonoBehaviour
     private readonly System.Collections.Generic.List<DetailPlaceOption> _placeOptions = new System.Collections.Generic.List<DetailPlaceOption>();
     private int _selectedPlaceIndex;
     private bool _isFacilityListExpanded;
+    private IVisualElementScheduledItem _copyToastHideSchedule;
 
     void Awake()
     {
@@ -122,22 +165,29 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         _facilityToggleButton = _root.Q<VisualElement>("facility-toggle-button");
         _facilityList = _root.Q<ScrollView>("facility-list");
         _addressRow = _root.Q<VisualElement>("address-row");
+        _lotAddressGroup = _root.Q<VisualElement>("lot-address-group");
+        _roadAddressGroup = _root.Q<VisualElement>("road-address-group");
         _phoneRow = _root.Q<VisualElement>("phone-row");
         _mapActionRow = _root.Q<VisualElement>("map-action-row");
+        _copyToast = _root.Q<VisualElement>("copy-toast");
         _titleLabel = _root.Q<Label>("detail-title");
         _subtitleLabel = _root.Q<Label>("detail-subtitle");
         _facilityToggleLabel = _root.Q<Label>("facility-toggle-label");
         _facilitySelectedNameLabel = _root.Q<Label>("facility-selected-name");
         _facilityToggleChevronIcon = _root.Q<VisualElement>("facility-toggle-chevron");
-        _addressLabel = _root.Q<Label>("detail-address-value");
+        _lotAddressLabel = _root.Q<Label>("detail-lot-address-value");
+        _roadAddressLabel = _root.Q<Label>("detail-road-address-value");
         _phoneLabel = _root.Q<Label>("detail-phone-value");
+        _copyToastLabel = _root.Q<Label>("copy-toast-label");
         _closeButton = _root.Q<Button>("close-button");
-        _addressCopyButton = _root.Q<Button>("address-copy-button");
+        _lotAddressCopyButton = _root.Q<Button>("lot-address-copy-button");
+        _roadAddressCopyButton = _root.Q<Button>("road-address-copy-button");
         _phoneCallButton = _root.Q<Button>("phone-call-button");
         _mapOpenButton = _root.Q<Button>("map-open-button");
 
         if (_closeButton != null) _closeButton.clicked += Hide;
-        if (_addressCopyButton != null) _addressCopyButton.clicked += () => OnCopyRequested?.Invoke();
+        if (_lotAddressCopyButton != null) _lotAddressCopyButton.clicked += () => CopyAddress(CurrentDisplayedLotNumberAddress, "복사되었습니다.");
+        if (_roadAddressCopyButton != null) _roadAddressCopyButton.clicked += () => CopyAddress(CurrentDisplayedRoadAddress, "복사되었습니다.");
         if (_phoneCallButton != null) _phoneCallButton.clicked += () => OnPhoneRequested?.Invoke();
         if (_mapOpenButton != null) _mapOpenButton.clicked += () => OnMapRequested?.Invoke();
         if (_facilityToggleButton != null) _facilityToggleButton.RegisterCallback<ClickEvent>(OnFacilityToggleClicked);
@@ -203,6 +253,7 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         _isVisible = false;
         _overlay?.RemoveFromClassList("open");
         _sheet?.RemoveFromClassList("open");
+        HideCopyToastImmediate();
         _root.style.display = DisplayStyle.None;
     }
 
@@ -239,9 +290,17 @@ public class ARDetailPanelDocumentController : MonoBehaviour
             _subtitleLabel.text = hasCategory ? currentCategory : string.Empty;
         }
 
-        if (_addressLabel != null)
+        string lotNumberAddress = BuildLotNumberAddress(data);
+        string roadAddress = BuildRoadAddress(data);
+
+        if (_lotAddressLabel != null)
         {
-            _addressLabel.text = string.IsNullOrWhiteSpace(data.fetchedAddress) ? "주소 정보가 없습니다." : data.fetchedAddress;
+            _lotAddressLabel.text = string.IsNullOrWhiteSpace(lotNumberAddress) ? "지번 주소 정보가 없습니다." : lotNumberAddress;
+        }
+
+        if (_roadAddressLabel != null)
+        {
+            _roadAddressLabel.text = string.IsNullOrWhiteSpace(roadAddress) ? "도로명 주소 정보가 없습니다." : roadAddress;
         }
 
         if (_phoneLabel != null)
@@ -249,16 +308,34 @@ public class ARDetailPanelDocumentController : MonoBehaviour
             _phoneLabel.text = string.IsNullOrWhiteSpace(currentPhone) ? "전화번호 정보가 없습니다." : currentPhone;
         }
 
-        if (_addressCopyButton != null)
+        bool hasLotNumberAddress = !string.IsNullOrWhiteSpace(lotNumberAddress);
+        bool hasRoadAddress = !string.IsNullOrWhiteSpace(roadAddress);
+
+        if (_lotAddressCopyButton != null)
         {
-            _addressCopyButton.SetEnabled(!string.IsNullOrWhiteSpace(data.fetchedAddress));
+            _lotAddressCopyButton.SetEnabled(hasLotNumberAddress);
         }
 
-        bool hasAddress = !string.IsNullOrWhiteSpace(data.fetchedAddress);
+        if (_roadAddressCopyButton != null)
+        {
+            _roadAddressCopyButton.SetEnabled(hasRoadAddress);
+        }
+
+        bool hasAddress = hasLotNumberAddress || hasRoadAddress;
 
         if (_addressRow != null)
         {
             _addressRow.style.display = hasAddress ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        if (_lotAddressGroup != null)
+        {
+            _lotAddressGroup.style.display = hasLotNumberAddress ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        if (_roadAddressGroup != null)
+        {
+            _roadAddressGroup.style.display = hasRoadAddress ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         bool hasPhone = !string.IsNullOrWhiteSpace(currentPhone);
@@ -281,6 +358,70 @@ public class ARDetailPanelDocumentController : MonoBehaviour
         {
             _mapOpenButton.SetEnabled(hasMap);
         }
+    }
+
+    private string BuildLotNumberAddress(BuildingData data)
+    {
+        if (data == null)
+        {
+            return string.Empty;
+        }
+
+        return string.IsNullOrWhiteSpace(data.lotNumberAddress)
+            ? data.fetchedAddress
+            : data.lotNumberAddress;
+    }
+
+    private string BuildRoadAddress(BuildingData data)
+    {
+        if (data == null)
+        {
+            return string.Empty;
+        }
+
+        return data.roadAddress ?? string.Empty;
+    }
+
+    private void CopyAddress(string address, string toastMessage)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return;
+        }
+
+        GUIUtility.systemCopyBuffer = address;
+        ShowCopyToast(toastMessage);
+    }
+
+    private void ShowCopyToast(string message)
+    {
+        if (_copyToast == null)
+        {
+            return;
+        }
+
+        if (_copyToastLabel != null)
+        {
+            _copyToastLabel.text = string.IsNullOrWhiteSpace(message)
+                ? "복사되었습니다."
+                : message;
+        }
+
+        _copyToastHideSchedule?.Pause();
+        _copyToast.RemoveFromClassList("copy-toast--visible");
+        _copyToast.BringToFront();
+        _copyToast.schedule.Execute(() =>
+        {
+            _copyToast.BringToFront();
+            _copyToast.AddToClassList("copy-toast--visible");
+        }).ExecuteLater(10);
+        _copyToastHideSchedule = _copyToast.schedule.Execute(HideCopyToastImmediate);
+        _copyToastHideSchedule.ExecuteLater(1400);
+    }
+
+    private void HideCopyToastImmediate()
+    {
+        _copyToast?.RemoveFromClassList("copy-toast--visible");
     }
 
     private void BuildPlaceOptions(BuildingData data)
