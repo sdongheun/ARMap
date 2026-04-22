@@ -586,7 +586,7 @@ MonoBehaviour:
   maxWorldTextMarkers: 20
   enableWorldTextMarker: 1
   markerRenderMode: 1
-  markerAltitudeOffsetMeters: 1
+  markerAltitudeOffsetMeters: 0
   worldMarkerLocalOffsetMeters: 0
   worldMarkerShellDistanceScale: 0.675
   worldMarkerShellMinRadius: 1.5
@@ -606,7 +606,7 @@ MonoBehaviour:
   centerViewportThreshold: 0.35
   forwardGroupViewportThreshold: 0.14
   groupedCandidateDistanceBias: 6
-  landscapeDetectionRadius: 140
+  landscapeDetectionRadius: 180
   landscapeDetectionAngle: 180
   landscapeMaxPreviewAnchors: 5
   landscapeCenterViewportThreshold: 0.3

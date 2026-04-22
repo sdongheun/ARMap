@@ -110,7 +110,7 @@ public partial class GeospatialManager : MonoBehaviour
     public int maxWorldTextMarkers = 20; // 후보로 유지할 최대 건물 수
     public bool enableWorldTextMarker = true; // 원인 분리용: 텍스트 마커 생성/표시 토글
     public MarkerRenderMode markerRenderMode = MarkerRenderMode.World3D; // 2D/3D 마커 렌더 방식
-    public double markerAltitudeOffsetMeters = 1.0; // 지면 고도 기준 앵커 오프셋
+    public double markerAltitudeOffsetMeters = 0.0; // 현재 휴대폰(카메라) 고도를 그대로 사용
     public float worldMarkerLocalOffsetMeters = 0.0f; // 앵커 기준 3D 마커 추가 높이
     public float worldMarkerShellDistanceScale = 0.675f; // 카메라와 건물 거리 대비 텍스트 전진 비율
     public float worldMarkerShellMinRadius = 1.5f; // 텍스트가 건물 중심에서 최소 떨어지는 거리
@@ -136,7 +136,7 @@ public partial class GeospatialManager : MonoBehaviour
     [Range(0.01f, 0.25f)] public float forwardGroupViewportThreshold = 0.14f; // 같은 전방 시야선상 판정 범위
     public float groupedCandidateDistanceBias = 6.0f; // 같은 그룹에서 후면 후보를 제거하는 최소 거리차
     [Header("Landscape Detection Profile")]
-    public float landscapeDetectionRadius = 140.0f; // 가로모드에서 더 넓게 허용할 감지 반경
+    public float landscapeDetectionRadius = 180.0f; // 가로모드에서 더 넓게 허용할 감지 반경
     public float landscapeDetectionAngle = 180.0f; // 가로모드에서 좌우로 더 많이 보이도록 확장한 감지 각도
     public int landscapeMaxPreviewAnchors = 5; // 가로모드에서 동시에 유지할 최대 앵커 수
     [Range(0.01f, 0.35f)] public float landscapeCenterViewportThreshold = 0.30f; // 가로모드에서 중앙 텍스트 선택을 더 엄격하게 하는 범위
@@ -449,7 +449,6 @@ public partial class GeospatialManager : MonoBehaviour
             pose,
             isEarthTracking,
             35.0f,
-            anchorPreviewRadius,
             detectionAngle,
             _cameraTransform != null ? _cameraTransform.forward : Vector3.forward,
             verticalAngleLimit,
@@ -459,11 +458,12 @@ public partial class GeospatialManager : MonoBehaviour
             centerViewportThreshold,
             maxPreviewAnchors);
         List<VisibleBuildingCandidate> visibleCandidates = selection.visibleCandidates;
+        List<VisibleBuildingCandidate> previewCandidates = selection.previewCandidates;
         List<VisibleBuildingCandidate> topCandidates = selection.topCandidates;
         BuildingData bestTarget = selection.focusedBuilding;
         UpdateDetectionDebugState(selection);
-        RequestAnchorPoolForCandidates(topCandidates);
-        UpdatePreviewMarkers(topCandidates, bestTarget);
+        RequestAnchorPoolForCandidates(previewCandidates);
+        UpdatePreviewMarkers(previewCandidates, bestTarget);
 
         if (bestTarget != null)
         {
@@ -475,8 +475,9 @@ public partial class GeospatialManager : MonoBehaviour
             if (_currentDetectedBuilding != bestTarget)
             {
                 _currentDetectedBuilding = bestTarget;
-                UpdateMarkerScale(bestTarget);
             }
+
+            UpdateMarkerScale(bestTarget);
 
             arUIManager.ShowQuickInfo(_selectedBuilding, GetDistanceToBuilding(_selectedBuilding));
         }
@@ -523,12 +524,6 @@ public partial class GeospatialManager : MonoBehaviour
 
     void UpdateMarkerScale(BuildingData targetBuilding)
     {
-        if (_currentActiveMarker != null)
-        {
-            _currentActiveMarker.SetState(BuildingMarker.MarkerVisualState.Preview);
-            _currentActiveMarker = null;
-        }
-
         if (!ShouldRenderWorldMarkers())
         {
             arUIManager?.SetWorldInfoDetailButtonState(null, false);
@@ -550,6 +545,14 @@ public partial class GeospatialManager : MonoBehaviour
 
             if (marker != null && anchor != null)
             {
+                bool isSameActiveMarker = _currentActiveMarker != null &&
+                                          IsSameBuilding(_currentActiveMarker.GetBoundBuilding(), targetBuilding);
+                if (!isSameActiveMarker && _currentActiveMarker != null)
+                {
+                    _currentActiveMarker.SetState(BuildingMarker.MarkerVisualState.Preview);
+                    _currentActiveMarker = null;
+                }
+
                 ApplyMarkerPlacement(marker, 0, 1);
                 UpdateMarkerInfoContent(marker, targetBuilding);
                 marker.SetInfoVisible(true);
@@ -563,7 +566,6 @@ public partial class GeospatialManager : MonoBehaviour
 
         arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
-
     bool IsSelectedMarkerVisibleOnScreen(BuildingMarker marker)
     {
         if (marker == null || !marker.IsSelectedTextVisible())
@@ -784,9 +786,9 @@ public partial class GeospatialManager : MonoBehaviour
         arUIManager?.SetWorldInfoDetailButtonState(null, false);
     }
 
-    void RequestAnchorPoolForCandidates(List<VisibleBuildingCandidate> topCandidates)
+    void RequestAnchorPoolForCandidates(List<VisibleBuildingCandidate> previewCandidates)
     {
-        List<BuildingData> desiredBuildings = AnchorPoolPlanner.BuildDesiredBuildings(topCandidates);
+        List<BuildingData> desiredBuildings = AnchorPoolPlanner.BuildDesiredBuildings(previewCandidates);
         string signature = AnchorPoolPlanner.BuildPoolSignature(desiredBuildings);
         if (signature == _lastAnchorPoolSignature)
         {
@@ -886,6 +888,30 @@ public partial class GeospatialManager : MonoBehaviour
 
         Vector3 anchorPosition = anchorTransform.position;
         Vector3 targetPosition = anchorPosition + (Vector3.up * worldMarkerLocalOffsetMeters);
+
+        if (_cameraTransform != null)
+        {
+            Vector3 anchorToCamera = _cameraTransform.position - anchorPosition;
+            float cameraDistance = anchorToCamera.magnitude;
+
+            if (cameraDistance > 0.01f)
+            {
+                float pullDistance = Mathf.Clamp(
+                    cameraDistance * worldMarkerShellDistanceScale,
+                    worldMarkerShellMinRadius,
+                    worldMarkerShellMaxRadius);
+
+                float nearLimitDistance = cameraDistance * worldMarkerShellNearLimitFactor;
+                if (nearLimitDistance > 0f)
+                {
+                    pullDistance = Mathf.Min(pullDistance, nearLimitDistance);
+                }
+
+                targetPosition = anchorPosition +
+                                 (anchorToCamera.normalized * pullDistance) +
+                                 (Vector3.up * worldMarkerLocalOffsetMeters);
+            }
+        }
 
         marker.transform.position = targetPosition;
         marker.transform.localRotation = Quaternion.identity;
@@ -1042,9 +1068,9 @@ public partial class GeospatialManager : MonoBehaviour
                     building.latitude,
                     building.longitude)
             })
-            .Where(item => item.distance <= anchorCreationRadius)
+            // Keep preview-dot candidates regardless of distance so dots do not disappear first.
+            // Selected text still uses detectionRadius inside the visibility planner.
             .OrderBy(item => item.distance)
-            .Take(Mathf.Max(1, maxWorldTextMarkers))
             .Select(item => item.building)
             .ToList();
     }

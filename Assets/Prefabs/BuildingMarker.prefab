@@ -48,7 +48,7 @@ MonoBehaviour:
   previewScale: 0.36
   activeScale: 0.54
   animSpeed: 8
-  labelHeight: 1.4
+  labelHeight: 0
   previewDotSize: 0.6
   titleFontSize: 8.7
   subtitleFontSize: 4.8

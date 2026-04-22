@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering;
+using System.Collections.Generic;
 
 public class BuildingMarker : MonoBehaviour
 {
@@ -16,8 +17,8 @@ public class BuildingMarker : MonoBehaviour
     public float previewScale = 0.36f;
     public float activeScale = 0.54f;
     public float animSpeed = 8.0f;
-    public float labelHeight = 1.4f;
-    public float previewDotSize = 3f;
+    public float labelHeight = 0.0f;
+    public float previewPinSize = 1.62f;
     public float titleFontSize = 8.1f;
     public float subtitleFontSize = 4.2f;
     public float distanceFontSize = 4.3f;
@@ -50,12 +51,15 @@ public class BuildingMarker : MonoBehaviour
     private Transform _cachedCameraTransform;
     private Renderer _buttonPlateRenderer;
     private Material _buttonPlateMaterial;
-    private Renderer _dotRenderer;
-    private Material _dotMaterial;
+    private readonly List<Renderer> _dotRenderers = new List<Renderer>();
+    private readonly List<Material> _dotMaterials = new List<Material>();
     private BoxCollider _hitCollider;
     private BuildingData _boundBuilding;
     private const float DefaultPreviewTextScale = 0.36f;
     private const float DefaultActiveTextScale = 0.54f;
+    private static readonly Vector3 PreviewPinHeadScale = new Vector3(0.34f, 0.34f, 0.34f);
+    private static readonly Vector3 PreviewPinStemScale = new Vector3(0.09f, 0.28f, 0.09f);
+    private static readonly Vector3 PreviewPinTipScale = new Vector3(0.12f, 0.12f, 0.12f);
 
     void Awake()
     {
@@ -65,6 +69,7 @@ public class BuildingMarker : MonoBehaviour
     void Update()
     {
         transform.localScale = Vector3.Lerp(transform.localScale, _targetScaleVec, Time.deltaTime * animSpeed);
+        UpdatePreviewPinScale();
 
         if (_cachedCameraTransform == null && Camera.main != null)
         {
@@ -116,48 +121,79 @@ public class BuildingMarker : MonoBehaviour
 
         CreateDotVisual();
         CreateButtonPlate(_visualRoot);
-        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 1.08f, 0f), titleFontSize, FontStyles.Bold);
-        _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, 0.18f, 0f), subtitleFontSize, FontStyles.Normal);
-        _distanceText = CreateTextNode("Distance", _visualRoot, new Vector3(0f, -0.76f, 0f), distanceFontSize, FontStyles.Bold);
+        _titleText = CreateTextNode("Title", _visualRoot, new Vector3(0f, 1.08f, 0.02f), titleFontSize, FontStyles.Bold);
+        _subtitleText = CreateTextNode("Subtitle", _visualRoot, new Vector3(0f, 0.18f, 0.02f), subtitleFontSize, FontStyles.Normal);
+        _distanceText = CreateTextNode("Distance", _visualRoot, new Vector3(0f, -0.76f, 0.02f), distanceFontSize, FontStyles.Bold);
         EnsureHitCollider();
     }
 
     void CreateDotVisual()
     {
-        GameObject dotObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        dotObject.name = "PreviewDot";
+        GameObject dotObject = new GameObject("PreviewPin");
         _dotRoot = dotObject.transform;
         _dotRoot.SetParent(transform, false);
         _dotRoot.localPosition = new Vector3(0f, labelHeight, 0f);
         _dotRoot.localRotation = Quaternion.identity;
-        _dotRoot.localScale = Vector3.one * previewDotSize;
+        _dotRoot.localScale = Vector3.one;
 
-        Collider dotCollider = dotObject.GetComponent<Collider>();
-        if (dotCollider != null)
+        CreatePinPart("PinHead", PrimitiveType.Sphere, new Vector3(0f, 0.34f, 0f), PreviewPinHeadScale);
+        CreatePinPart("PinStem", PrimitiveType.Cylinder, new Vector3(0f, -0.02f, 0f), PreviewPinStemScale);
+        CreatePinPart("PinTip", PrimitiveType.Sphere, new Vector3(0f, -0.38f, 0f), PreviewPinTipScale);
+        UpdatePreviewPinScale();
+    }
+
+    void UpdatePreviewPinScale()
+    {
+        if (_dotRoot == null)
         {
-            Destroy(dotCollider);
+            return;
         }
 
-        _dotRenderer = dotObject.GetComponent<Renderer>();
-        if (_dotRenderer != null)
+        float parentScale = Mathf.Max(0.0001f, transform.localScale.x);
+        float normalizedPinScale = previewPinSize / parentScale;
+        _dotRoot.localScale = Vector3.one * normalizedPinScale;
+    }
+
+    void CreatePinPart(string objectName, PrimitiveType primitiveType, Vector3 localPosition, Vector3 localScale)
+    {
+        GameObject partObject = GameObject.CreatePrimitive(primitiveType);
+        partObject.name = objectName;
+        partObject.transform.SetParent(_dotRoot, false);
+        partObject.transform.localPosition = localPosition;
+        partObject.transform.localRotation = Quaternion.identity;
+        partObject.transform.localScale = localScale;
+
+        Collider partCollider = partObject.GetComponent<Collider>();
+        if (partCollider != null)
         {
-            Shader shader = Shader.Find("Unlit/Color");
-            if (shader == null)
-            {
-                shader = Shader.Find("Sprites/Default");
-            }
-
-            if (shader != null)
-            {
-                _dotMaterial = new Material(shader);
-                _dotRenderer.material = _dotMaterial;
-            }
-
-            _dotRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            _dotRenderer.receiveShadows = false;
-            _dotRenderer.lightProbeUsage = LightProbeUsage.Off;
-            _dotRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            Destroy(partCollider);
         }
+
+        Renderer partRenderer = partObject.GetComponent<Renderer>();
+        if (partRenderer == null)
+        {
+            return;
+        }
+
+        Shader shader = Shader.Find("Unlit/Color");
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        if (shader != null)
+        {
+            Material material = new Material(shader);
+            partRenderer.material = material;
+            _dotMaterials.Add(material);
+        }
+
+        partRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        partRenderer.receiveShadows = false;
+        partRenderer.lightProbeUsage = LightProbeUsage.Off;
+        partRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        partRenderer.sortingOrder = 2;
+        _dotRenderers.Add(partRenderer);
     }
 
     void CreateButtonPlate(Transform parent)
@@ -165,7 +201,7 @@ public class BuildingMarker : MonoBehaviour
         GameObject plateObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
         plateObject.name = "ButtonPlate";
         plateObject.transform.SetParent(parent, false);
-        plateObject.transform.localPosition = new Vector3(0f, 0.03f, 0.06f);
+        plateObject.transform.localPosition = new Vector3(0f, 0f, -0.06f);
         plateObject.transform.localRotation = Quaternion.identity;
         plateObject.transform.localScale = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 1f);
 
@@ -178,6 +214,7 @@ public class BuildingMarker : MonoBehaviour
         _buttonPlateRenderer = plateObject.GetComponent<Renderer>();
         if (_buttonPlateRenderer != null)
         {
+            _buttonPlateRenderer.sortingOrder = 0;
             Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
             {
@@ -209,7 +246,7 @@ public class BuildingMarker : MonoBehaviour
             _hitCollider = gameObject.AddComponent<BoxCollider>();
         }
 
-        _hitCollider.center = new Vector3(0f, labelHeight + 0.05f, 0.05f);
+        _hitCollider.center = new Vector3(0f, labelHeight, 0.05f);
         _hitCollider.size = new Vector3(buttonPlateSize.x, buttonPlateSize.y, 0.4f);
         _hitCollider.enabled = false;
     }
@@ -267,6 +304,7 @@ public class BuildingMarker : MonoBehaviour
         MeshRenderer textRenderer = tmp.GetComponent<MeshRenderer>();
         if (textRenderer != null)
         {
+            textRenderer.sortingOrder = 1;
             textRenderer.shadowCastingMode = ShadowCastingMode.Off;
             textRenderer.receiveShadows = false;
             textRenderer.lightProbeUsage = LightProbeUsage.Off;
@@ -347,9 +385,12 @@ public class BuildingMarker : MonoBehaviour
 
     void ApplyDotColor(Color color)
     {
-        if (_dotMaterial != null)
+        foreach (Material dotMaterial in _dotMaterials)
         {
-            _dotMaterial.color = color;
+            if (dotMaterial != null)
+            {
+                dotMaterial.color = color;
+            }
         }
     }
 
@@ -426,7 +467,6 @@ public class BuildingMarker : MonoBehaviour
 
         return configuredValue;
     }
-
     public void SetInfoContent(string title, string subtitle, string distance)
     {
         if (!_isInitialized)

@@ -13,6 +13,7 @@ public class VisibleBuildingCandidate
 public class AnchorVisibilitySelection
 {
     public List<VisibleBuildingCandidate> visibleCandidates = new List<VisibleBuildingCandidate>();
+    public List<VisibleBuildingCandidate> previewCandidates = new List<VisibleBuildingCandidate>();
     public List<VisibleBuildingCandidate> topCandidates = new List<VisibleBuildingCandidate>();
     public BuildingData focusedBuilding;
 }
@@ -24,7 +25,6 @@ public static class AnchorVisibilityPlanner
         GeospatialPose pose,
         bool isEarthTracking,
         float headingAccuracyThreshold,
-        float anchorPreviewRadius,
         float detectionAngle,
         Vector3 cameraForward,
         float verticalAngleLimit,
@@ -40,8 +40,8 @@ public static class AnchorVisibilityPlanner
             pose,
             isEarthTracking,
             headingAccuracyThreshold,
-            anchorPreviewRadius,
             detectionAngle);
+        selection.previewCandidates = GetPreviewCandidates(selection.visibleCandidates);
         selection.topCandidates = GetTopCandidates(
             selection.visibleCandidates,
             detectionRadius,
@@ -61,7 +61,6 @@ public static class AnchorVisibilityPlanner
         GeospatialPose pose,
         bool isEarthTracking,
         float headingAccuracyThreshold,
-        float anchorPreviewRadius,
         float detectionAngle)
     {
         List<VisibleBuildingCandidate> visibleBuildings = new List<VisibleBuildingCandidate>();
@@ -89,11 +88,6 @@ public static class AnchorVisibilityPlanner
                 building.latitude,
                 building.longitude);
 
-            if (distance > anchorPreviewRadius)
-            {
-                continue;
-            }
-
             float signedHeadingDelta = Mathf.DeltaAngle(
                 (float)pose.Heading,
                 (float)CalculateBearingDegrees(pose.Latitude, pose.Longitude, building.latitude, building.longitude));
@@ -120,6 +114,21 @@ public static class AnchorVisibilityPlanner
         }
 
         return visibleBuildings;
+    }
+
+    public static List<VisibleBuildingCandidate> GetPreviewCandidates(
+        List<VisibleBuildingCandidate> visibleCandidates)
+    {
+        if (visibleCandidates == null || visibleCandidates.Count == 0)
+        {
+            return new List<VisibleBuildingCandidate>();
+        }
+
+        return visibleCandidates
+            .Where(candidate => candidate?.building != null)
+            .OrderBy(candidate => Mathf.Abs(candidate.viewportPoint.x - 0.5f) + Mathf.Abs(candidate.viewportPoint.y - 0.5f))
+            .ThenBy(candidate => candidate.distance)
+            .ToList();
     }
 
     public static BuildingData DetermineFocusedBuilding(
