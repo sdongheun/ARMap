@@ -400,6 +400,7 @@ public class NavigationManager : MonoBehaviour
 
         SetState(NavigationState.Routing);
         arUIManager?.EnterNavigationMode();
+        arUIManager?.SetNavigationDestination(destName);
         arUIManager?.ShowToast("경로를 계산하고 있습니다...");
         StartCoroutine(FetchRouteAndStart(destLat, destLon, destName));
     }
@@ -475,6 +476,7 @@ public class NavigationManager : MonoBehaviour
         geospatialManager.isNavigationActive = true;
 
         arUIManager?.ShowNavigationHUD();
+        arUIManager?.SetNavigationDestination(destName);
         arUIManager?.UpdateRemainingDistance(route.totalDistance);
         arUIManager?.UpdateETA(route.totalDuration);
         arUIManager?.UpdateProgress(0f);

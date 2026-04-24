@@ -190,6 +190,7 @@ public partial class ARUIManager : MonoBehaviour
         EnsureBottomActionBarToolkit();
         RefreshFloatingButtonLayout(force: true);
         EnsureCenterReticle();
+        RefreshToastLayout();
     }
 
     // 프레임마다 중앙 레티클 애니메이션만 갱신한다.
@@ -217,17 +218,75 @@ public partial class ARUIManager : MonoBehaviour
         panelRect.offsetMax = Vector2.zero;
 
         Image panelBg = navigationSearchPanel.GetComponent<Image>();
-        panelBg.color = new Color(0.02f, 0.05f, 0.1f, 0.96f);
+        panelBg.color = new Color(0.02f, 0.05f, 0.09f, 0.985f);
 
-        // 상단 바 (입력 + 검색 + 닫기)
-        GameObject topBar = new GameObject("TopBar", typeof(RectTransform));
+        // 상단 감성 헤더
+        GameObject heroCard = new GameObject("SearchHeroCard", typeof(RectTransform), typeof(Image));
+        heroCard.transform.SetParent(navigationSearchPanel.transform, false);
+        RectTransform heroRect = heroCard.GetComponent<RectTransform>();
+        heroRect.anchorMin = new Vector2(0f, 1f);
+        heroRect.anchorMax = new Vector2(1f, 1f);
+        heroRect.pivot = new Vector2(0.5f, 1f);
+        heroRect.anchoredPosition = new Vector2(0f, -22f);
+        heroRect.sizeDelta = new Vector2(-36f, 126f);
+
+        Image heroBg = heroCard.GetComponent<Image>();
+        ApplyRoundedSurface(heroBg, GetNavigationPanelRoundedSprite(), new Color(0.07f, 0.12f, 0.18f, 0.99f));
+
+        GameObject heroAccent = new GameObject("HeroAccent", typeof(RectTransform), typeof(Image));
+        heroAccent.transform.SetParent(heroCard.transform, false);
+        RectTransform heroAccentRect = heroAccent.GetComponent<RectTransform>();
+        heroAccentRect.anchorMin = new Vector2(0f, 1f);
+        heroAccentRect.anchorMax = new Vector2(1f, 1f);
+        heroAccentRect.pivot = new Vector2(0.5f, 1f);
+        heroAccentRect.anchoredPosition = new Vector2(0f, -10f);
+        heroAccentRect.sizeDelta = new Vector2(-38f, 6f);
+        Image heroAccentImage = heroAccent.GetComponent<Image>();
+        ApplyRoundedSurface(heroAccentImage, GetNavigationChipRoundedSprite(), new Color(1f, 0.62f, 0.28f, 0.9f));
+
+        GameObject heroChip = new GameObject("HeroChip", typeof(RectTransform), typeof(Image));
+        heroChip.transform.SetParent(heroCard.transform, false);
+        RectTransform heroChipRect = heroChip.GetComponent<RectTransform>();
+        heroChipRect.anchorMin = new Vector2(0f, 1f);
+        heroChipRect.anchorMax = new Vector2(0f, 1f);
+        heroChipRect.pivot = new Vector2(0f, 1f);
+        heroChipRect.anchoredPosition = new Vector2(18f, -24f);
+        heroChipRect.sizeDelta = new Vector2(118f, 28f);
+        Image heroChipImage = heroChip.GetComponent<Image>();
+        ApplyRoundedSurface(heroChipImage, GetNavigationChipRoundedSprite(), new Color(0.18f, 0.54f, 0.67f, 0.82f));
+
+        TextMeshProUGUI heroChipText = CreateHUDText("HeroChipText", heroChip.transform,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero,
+            "AR 도보 안내", 14f, FontStyles.Bold, TextAlignmentOptions.Center);
+        heroChipText.color = new Color(0.91f, 0.98f, 1f, 1f);
+
+        TextMeshProUGUI heroTitle = CreateHUDText("HeroTitle", heroCard.transform,
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f),
+            new Vector2(18f, -56f), new Vector2(-36f, 34f),
+            "어디로 걸어갈까요?", 28f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+        heroTitle.color = Color.white;
+
+        TextMeshProUGUI heroBody = CreateHUDText("HeroBody", heroCard.transform,
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f),
+            new Vector2(18f, -90f), new Vector2(-36f, 40f),
+            "건물명이나 장소명을 검색하면 AR 화살표로 바로 안내해 드려요.", 17f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+        heroBody.color = new Color(0.79f, 0.86f, 0.93f, 0.96f);
+        heroBody.textWrappingMode = TextWrappingModes.Normal;
+        heroBody.overflowMode = TextOverflowModes.Overflow;
+
+        // 상단 입력 카드
+        GameObject topBar = new GameObject("TopBar", typeof(RectTransform), typeof(Image));
         topBar.transform.SetParent(navigationSearchPanel.transform, false);
         RectTransform topRect = topBar.GetComponent<RectTransform>();
         topRect.anchorMin = new Vector2(0f, 1f);
         topRect.anchorMax = new Vector2(1f, 1f);
         topRect.pivot = new Vector2(0.5f, 1f);
-        topRect.anchoredPosition = new Vector2(0f, -60f);
-        topRect.sizeDelta = new Vector2(-48f, 56f);
+        topRect.anchoredPosition = new Vector2(0f, -164f);
+        topRect.sizeDelta = new Vector2(-36f, 76f);
+
+        Image topBarBg = topBar.GetComponent<Image>();
+        ApplyRoundedSurface(topBarBg, GetNavigationPanelRoundedSprite(), new Color(0.09f, 0.14f, 0.21f, 0.995f));
 
         // 입력 필드
         GameObject inputObj = new GameObject("DestinationInput", typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
@@ -235,11 +294,11 @@ public partial class ARUIManager : MonoBehaviour
         RectTransform inputRect = inputObj.GetComponent<RectTransform>();
         inputRect.anchorMin = new Vector2(0f, 0f);
         inputRect.anchorMax = new Vector2(1f, 1f);
-        inputRect.offsetMin = new Vector2(0f, 0f);
-        inputRect.offsetMax = new Vector2(-140f, 0f);
+        inputRect.offsetMin = new Vector2(14f, 12f);
+        inputRect.offsetMax = new Vector2(-214f, -12f);
 
         Image inputBg = inputObj.GetComponent<Image>();
-        inputBg.color = new Color(0.15f, 0.18f, 0.22f, 1f);
+        ApplyRoundedSurface(inputBg, GetNavigationChipRoundedSprite(), new Color(0.14f, 0.18f, 0.25f, 1f));
 
         // 입력 필드 텍스트 영역
         GameObject inputTextArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
@@ -247,8 +306,8 @@ public partial class ARUIManager : MonoBehaviour
         RectTransform textAreaRect = inputTextArea.GetComponent<RectTransform>();
         textAreaRect.anchorMin = Vector2.zero;
         textAreaRect.anchorMax = Vector2.one;
-        textAreaRect.offsetMin = new Vector2(12f, 4f);
-        textAreaRect.offsetMax = new Vector2(-12f, -4f);
+        textAreaRect.offsetMin = new Vector2(16f, 6f);
+        textAreaRect.offsetMax = new Vector2(-16f, -6f);
 
         GameObject placeholderObj = CreateInputText("Placeholder", inputTextArea.transform, "목적지를 입력하세요", 0.5f);
         GameObject inputTextObj = CreateInputText("Text", inputTextArea.transform, "", 1f);
@@ -260,27 +319,59 @@ public partial class ARUIManager : MonoBehaviour
         inputField.fontAsset = SharedTMPFont;
         destinationInputField = inputField;
 
+        TextMeshProUGUI placeholderText = placeholderObj.GetComponent<TextMeshProUGUI>();
+        if (placeholderText != null)
+        {
+            placeholderText.fontSize = 20f;
+            placeholderText.color = new Color(0.68f, 0.75f, 0.82f, 0.72f);
+        }
+
+        TextMeshProUGUI inputText = inputTextObj.GetComponent<TextMeshProUGUI>();
+        if (inputText != null)
+        {
+            inputText.fontSize = 20f;
+            inputText.color = new Color(0.97f, 0.99f, 1f, 1f);
+        }
+
         // 검색 버튼
-        searchButton = CreatePanelButton("SearchBtn", topBar.transform, "검색",
+        searchButton = CreatePanelButton("SearchBtn", topBar.transform, "길찾기",
             new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f),
-            new Vector2(-70f, 0f), new Vector2(68f, 0f),
-            new Color(0.08f, 0.78f, 0.96f, 1f));
+            new Vector2(-78f, 0f), new Vector2(118f, -20f),
+            new Color(0.18f, 0.69f, 0.78f, 1f));
 
         // 닫기 버튼
-        closeSearchButton = CreatePanelButton("CloseBtn", topBar.transform, "✕",
+        closeSearchButton = CreatePanelButton("CloseBtn", topBar.transform, "닫기",
             new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f),
-            new Vector2(0f, 0f), new Vector2(56f, 0f),
-            new Color(0.4f, 0.4f, 0.45f, 1f));
+            new Vector2(0f, 0f), new Vector2(68f, -20f),
+            new Color(0.28f, 0.34f, 0.42f, 1f));
         closeSearchButton.onClick.AddListener(HideSearchPanel);
+
+        TextMeshProUGUI searchButtonText = searchButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (searchButtonText != null)
+        {
+            searchButtonText.fontSize = 19f;
+        }
+
+        // 결과 영역 카드
+        GameObject resultsCard = new GameObject("ResultsCard", typeof(RectTransform), typeof(Image));
+        resultsCard.transform.SetParent(navigationSearchPanel.transform, false);
+        RectTransform resultsCardRect = resultsCard.GetComponent<RectTransform>();
+        resultsCardRect.anchorMin = new Vector2(0f, 0f);
+        resultsCardRect.anchorMax = new Vector2(1f, 1f);
+        resultsCardRect.offsetMin = new Vector2(18f, 100f);
+        resultsCardRect.offsetMax = new Vector2(-18f, -252f);
+
+        Image resultsBg = resultsCard.GetComponent<Image>();
+        ApplyRoundedSurface(resultsBg, GetNavigationPanelRoundedSprite(), new Color(0.06f, 0.10f, 0.16f, 0.99f));
 
         // ScrollRect (루트)
         GameObject scrollObj = new GameObject("SearchScrollView", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
-        scrollObj.transform.SetParent(navigationSearchPanel.transform, false);
+        scrollObj.transform.SetParent(resultsCard.transform, false);
         RectTransform scrollRootRect = scrollObj.GetComponent<RectTransform>();
         scrollRootRect.anchorMin = new Vector2(0f, 0f);
         scrollRootRect.anchorMax = new Vector2(1f, 1f);
-        scrollRootRect.offsetMin = new Vector2(24f, 24f);
-        scrollRootRect.offsetMax = new Vector2(-24f, -130f);
+        scrollRootRect.offsetMin = new Vector2(0f, 0f);
+        scrollRootRect.offsetMax = new Vector2(0f, 0f);
 
         Image scrollBg = scrollObj.GetComponent<Image>();
         scrollBg.color = new Color(0f, 0f, 0f, 0.001f); // 거의 투명(레이캐스트용)
@@ -303,13 +394,13 @@ public partial class ARUIManager : MonoBehaviour
         contentRect.anchorMin = new Vector2(0f, 1f);
         contentRect.anchorMax = new Vector2(1f, 1f);
         contentRect.pivot = new Vector2(0.5f, 1f);
-        contentRect.offsetMin = new Vector2(0f, 0f);
-        contentRect.offsetMax = new Vector2(0f, 0f);
+        contentRect.offsetMin = new Vector2(14f, 0f);
+        contentRect.offsetMax = new Vector2(-14f, 0f);
         contentRect.sizeDelta = new Vector2(0f, 0f);
 
         VerticalLayoutGroup layout = contentObj.GetComponent<VerticalLayoutGroup>();
-        layout.spacing = 8f;
-        layout.padding = new RectOffset(0, 0, 0, 8);
+        layout.spacing = 12f;
+        layout.padding = new RectOffset(0, 0, 16, 18);
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
         layout.childControlHeight = false;
@@ -332,18 +423,21 @@ public partial class ARUIManager : MonoBehaviour
 
         // 상태 인디케이터 (로딩 / 빈결과) - Scroll 위에 오버레이
         _searchStatusText = new GameObject("SearchStatus", typeof(RectTransform), typeof(TextMeshProUGUI));
-        _searchStatusText.transform.SetParent(navigationSearchPanel.transform, false);
+        _searchStatusText.transform.SetParent(resultsCard.transform, false);
         RectTransform statusRect = _searchStatusText.GetComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0.5f, 0.5f);
         statusRect.anchorMax = new Vector2(0.5f, 0.5f);
         statusRect.pivot = new Vector2(0.5f, 0.5f);
         statusRect.anchoredPosition = new Vector2(0f, 0f);
-        statusRect.sizeDelta = new Vector2(400f, 60f);
+        statusRect.sizeDelta = new Vector2(420f, 86f);
         TextMeshProUGUI statusTmp = _searchStatusText.GetComponent<TextMeshProUGUI>();
         statusTmp.text = "";
         statusTmp.fontSize = 22f;
+        statusTmp.fontStyle = FontStyles.Bold;
         statusTmp.alignment = TextAlignmentOptions.Center;
-        statusTmp.color = new Color(0.7f, 0.78f, 0.86f, 1f);
+        statusTmp.color = new Color(0.82f, 0.89f, 0.95f, 1f);
+        statusTmp.textWrappingMode = TextWrappingModes.Normal;
+        statusTmp.overflowMode = TextOverflowModes.Overflow;
         ApplySharedTextStyle(statusTmp);
         _searchStatusText.SetActive(false);
 
@@ -362,12 +456,81 @@ public partial class ARUIManager : MonoBehaviour
 
     GameObject _searchStatusText;
     private bool _inputSubmitBound;
-    private TextMeshProUGUI _turnIconText;
+    private NavigationGlyphGraphic _turnIconGraphic;
+    private Image _turnIconBackground;
+    private TextMeshProUGUI _turnTypeText;
+    private TextMeshProUGUI _destinationTitleText;
+    private TextMeshProUGUI _distanceCaptionText;
     private TextMeshProUGUI _etaText;
     private Image _progressFill;
     private GameObject _trackingWarningBadge;
+    private TextMeshProUGUI _trackingWarningText;
     private GameObject _reroutingIndicator;
+    private TextMeshProUGUI _reroutingText;
     private Coroutine _reroutingAnimRoutine;
+    private RectTransform _offScreenArrowRoot;
+    private NavigationGlyphGraphic _offScreenIndicatorGraphic;
+    private TextMeshProUGUI _offScreenIndicatorText;
+    private Sprite _navigationPanelRoundedSprite;
+    private Sprite _navigationChipRoundedSprite;
+    private string _currentNavigationDestination = string.Empty;
+
+    // 토스트 패널을 현재 UI 상태에 맞는 안전한 위치로 재배치한다.
+    void RefreshToastLayout(bool bringToFront = false)
+    {
+        if (toastPanel == null)
+        {
+            return;
+        }
+
+        RectTransform toastRect = toastPanel.GetComponent<RectTransform>();
+        if (toastRect != null)
+        {
+            bool searchPanelActive = navigationSearchPanel != null && navigationSearchPanel.activeSelf;
+            bool navigationHudActive = navigationHUD != null && navigationHUD.activeSelf;
+            bool navigationSurfaceActive = searchPanelActive || navigationHudActive;
+            float toastBottom = searchPanelActive ? 26f : (navigationHudActive ? 110f : 88f);
+            float toastHeight = navigationSurfaceActive ? 58f : 54f;
+
+            toastRect.anchorMin = new Vector2(0.5f, 0f);
+            toastRect.anchorMax = new Vector2(0.5f, 0f);
+            toastRect.pivot = new Vector2(0.5f, 0f);
+            toastRect.anchoredPosition = new Vector2(0f, toastBottom);
+            toastRect.sizeDelta = new Vector2(Mathf.Min(Screen.width - 48f, 420f), toastHeight);
+        }
+
+        if (toastText != null)
+        {
+            RectTransform textRect = toastText.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(18f, 8f);
+            textRect.offsetMax = new Vector2(-18f, -8f);
+            toastText.fontSize = 18f;
+            toastText.alignment = TextAlignmentOptions.Center;
+            toastText.textWrappingMode = TextWrappingModes.Normal;
+            toastText.overflowMode = TextOverflowModes.Ellipsis;
+            toastText.raycastTarget = false;
+            ApplySharedTextStyle(toastText);
+        }
+
+        if (bringToFront || toastPanel.activeSelf)
+        {
+            toastPanel.transform.SetAsLastSibling();
+        }
+    }
+
+    // 내비 화면 진입 시 상태 배지를 즉시 치워 잔상이 비치지 않게 한다.
+    void ForceHideStatusBadge()
+    {
+        if (_statusBadgeRoutine != null)
+        {
+            StopCoroutine(_statusBadgeRoutine);
+            _statusBadgeRoutine = null;
+        }
+
+        SetStatusBadgeHiddenImmediate();
+    }
 
     // 검색 패널을 로딩 문구만 보이는 상태로 초기화한다.
     public void ShowSearchLoading()
@@ -378,7 +541,7 @@ public partial class ARUIManager : MonoBehaviour
         {
             _searchStatusText.SetActive(true);
             TextMeshProUGUI tmp = _searchStatusText.GetComponent<TextMeshProUGUI>();
-            if (tmp != null) tmp.text = "검색 중...";
+            if (tmp != null) tmp.text = "가까운 목적지를 찾고 있어요\n잠시만 기다려 주세요";
         }
     }
 
@@ -391,7 +554,9 @@ public partial class ARUIManager : MonoBehaviour
         {
             _searchStatusText.SetActive(true);
             TextMeshProUGUI tmp = _searchStatusText.GetComponent<TextMeshProUGUI>();
-            if (tmp != null) tmp.text = message;
+            if (tmp != null) tmp.text = string.IsNullOrWhiteSpace(message)
+                ? "검색 결과가 없습니다\n다른 건물명이나 장소명을 입력해 주세요"
+                : message;
         }
     }
 
@@ -417,8 +582,44 @@ public partial class ARUIManager : MonoBehaviour
         tmp.fontSize = 22f;
         tmp.color = new Color(1f, 1f, 1f, alpha);
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
+        tmp.raycastTarget = false;
         ApplySharedTextStyle(tmp);
         return obj;
+    }
+
+    // 길찾기 패널에서 재사용하는 큰 라운드 스프라이트를 지연 생성한다.
+    Sprite GetNavigationPanelRoundedSprite()
+    {
+        if (_navigationPanelRoundedSprite == null)
+        {
+            _navigationPanelRoundedSprite = CreateRoundedRectSprite(96, 28);
+        }
+
+        return _navigationPanelRoundedSprite;
+    }
+
+    // 배지와 칩에 쓰는 조금 더 작은 라운드 스프라이트를 지연 생성한다.
+    Sprite GetNavigationChipRoundedSprite()
+    {
+        if (_navigationChipRoundedSprite == null)
+        {
+            _navigationChipRoundedSprite = CreateRoundedRectSprite(72, 22);
+        }
+
+        return _navigationChipRoundedSprite;
+    }
+
+    // 라운드 패널 공통 스타일을 적용한다.
+    void ApplyRoundedSurface(Image image, Sprite sprite, Color color)
+    {
+        if (image == null || sprite == null)
+        {
+            return;
+        }
+
+        image.sprite = sprite;
+        image.type = Image.Type.Sliced;
+        image.color = color;
     }
 
     // 검색 패널과 HUD에서 재사용하는 공통 버튼 UI를 생성한다.
@@ -436,24 +637,34 @@ public partial class ARUIManager : MonoBehaviour
         btnRect.sizeDelta = sizeDelta;
 
         Image img = btnObj.GetComponent<Image>();
-        img.color = bgColor;
+        ApplyRoundedSurface(img, GetNavigationChipRoundedSprite(), bgColor);
 
         GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         textObj.transform.SetParent(btnObj.transform, false);
         RectTransform textRect = textObj.GetComponent<RectTransform>();
         textRect.anchorMin = Vector2.zero;
         textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
+        textRect.offsetMin = new Vector2(10f, 4f);
+        textRect.offsetMax = new Vector2(-10f, -4f);
 
         TextMeshProUGUI tmp = textObj.GetComponent<TextMeshProUGUI>();
         tmp.text = label;
-        tmp.fontSize = 22f;
+        tmp.fontSize = label.Length >= 5 ? 18f : 20f;
+        tmp.fontStyle = FontStyles.Bold;
         tmp.color = Color.white;
         tmp.alignment = TextAlignmentOptions.Center;
+        tmp.raycastTarget = false;
         ApplySharedTextStyle(tmp);
 
-        return btnObj.GetComponent<Button>();
+        Button button = btnObj.GetComponent<Button>();
+        ColorBlock cb = button.colors;
+        cb.normalColor = bgColor;
+        cb.highlightedColor = Color.Lerp(bgColor, Color.white, 0.12f);
+        cb.pressedColor = Color.Lerp(bgColor, Color.black, 0.16f);
+        cb.selectedColor = cb.highlightedColor;
+        cb.disabledColor = Color.Lerp(bgColor, Color.black, 0.4f);
+        button.colors = cb;
+        return button;
     }
 
     // 검색 패널을 열고 입력/결과/상태를 초기화한다.
@@ -462,6 +673,7 @@ public partial class ARUIManager : MonoBehaviour
         EnsureSearchPanel();
         navigationSearchPanel.SetActive(true);
         BringNavigationSurfaceToFront(navigationSearchPanel.transform);
+        RefreshToastLayout(true);
         if (destinationInputField != null)
         {
             destinationInputField.text = "";
@@ -476,6 +688,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         if (navigationSearchPanel != null)
             navigationSearchPanel.SetActive(false);
+        RefreshToastLayout(true);
     }
 
     // 검색 결과 리스트를 새로 만들고 각 항목의 선택 콜백을 연결한다.
@@ -528,54 +741,80 @@ public partial class ARUIManager : MonoBehaviour
 
         GameObject itemObj = new GameObject("SearchResult", typeof(RectTransform), typeof(Image), typeof(Button));
         RectTransform itemRect = itemObj.GetComponent<RectTransform>();
-        itemRect.sizeDelta = new Vector2(0f, 88f);
+        itemRect.sizeDelta = new Vector2(0f, 152f);
 
         Image itemBg = itemObj.GetComponent<Image>();
-        itemBg.color = new Color(0.12f, 0.15f, 0.2f, 1f);
+        ApplyRoundedSurface(itemBg, GetNavigationPanelRoundedSprite(), new Color(0.08f, 0.13f, 0.19f, 0.995f));
 
         // 터치 피드백
         Button itemBtn = itemObj.GetComponent<Button>();
         ColorBlock cb = itemBtn.colors;
-        cb.normalColor = new Color(0.12f, 0.15f, 0.2f, 1f);
-        cb.highlightedColor = new Color(0.18f, 0.22f, 0.3f, 1f);
-        cb.pressedColor = new Color(0.08f, 0.1f, 0.14f, 1f);
-        cb.selectedColor = new Color(0.18f, 0.22f, 0.3f, 1f);
+        cb.normalColor = new Color(0.09f, 0.14f, 0.2f, 0.98f);
+        cb.highlightedColor = new Color(0.13f, 0.2f, 0.28f, 1f);
+        cb.pressedColor = new Color(0.06f, 0.1f, 0.16f, 1f);
+        cb.selectedColor = new Color(0.13f, 0.2f, 0.28f, 1f);
         itemBtn.colors = cb;
 
+        GameObject accentObj = new GameObject("Accent", typeof(RectTransform), typeof(Image));
+        accentObj.transform.SetParent(itemObj.transform, false);
+        RectTransform accentRect = accentObj.GetComponent<RectTransform>();
+        accentRect.anchorMin = new Vector2(0f, 0f);
+        accentRect.anchorMax = new Vector2(0f, 1f);
+        accentRect.pivot = new Vector2(0f, 0.5f);
+        accentRect.anchoredPosition = new Vector2(12f, 0f);
+        accentRect.sizeDelta = new Vector2(8f, -22f);
+        Image accentImage = accentObj.GetComponent<Image>();
+        accentImage.color = new Color(0.28f, 0.78f, 0.84f, 0.96f);
+
         TextMeshProUGUI nameTmp = CreateResultLabel("NameText", itemObj.transform, result.placeName,
-            24f, FontStyles.Bold, new Vector2(16f, -10f), new Vector2(-84f, -10f), 30f);
+            23f, FontStyles.Bold, new Vector2(30f, -16f), new Vector2(-112f, -16f), 32f);
         TextMeshProUGUI addrTmp = CreateResultLabel("AddressText", itemObj.transform,
             result.roadAddressName ?? result.addressName,
-            18f, FontStyles.Normal, new Vector2(16f, -42f), new Vector2(-84f, -42f), 24f);
-        addrTmp.color = new Color(0.7f, 0.75f, 0.82f, 1f);
-
-        if (!string.IsNullOrEmpty(result.categoryName))
-        {
-            TextMeshProUGUI catTmp = CreateResultLabel("CategoryText", itemObj.transform, result.categoryName,
-                16f, FontStyles.Normal, new Vector2(16f, -66f), new Vector2(-84f, -66f), 20f);
-            catTmp.color = new Color(0.08f, 0.78f, 0.96f, 0.9f);
-        }
+            17f, FontStyles.Normal, new Vector2(30f, -58f), new Vector2(-30f, -58f), 42f);
+        addrTmp.color = new Color(0.74f, 0.8f, 0.87f, 1f);
+        addrTmp.textWrappingMode = TextWrappingModes.Normal;
+        addrTmp.overflowMode = TextOverflowModes.Ellipsis;
 
         // 거리 라벨 (우측 상단)
         if (!string.IsNullOrEmpty(distanceStr))
         {
-            GameObject distObj = new GameObject("DistanceText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            GameObject distObj = new GameObject("DistanceChip", typeof(RectTransform), typeof(Image));
             distObj.transform.SetParent(itemObj.transform, false);
             RectTransform distRect = distObj.GetComponent<RectTransform>();
             distRect.anchorMin = new Vector2(1f, 1f);
             distRect.anchorMax = new Vector2(1f, 1f);
             distRect.pivot = new Vector2(1f, 1f);
-            distRect.anchoredPosition = new Vector2(-16f, -14f);
-            distRect.sizeDelta = new Vector2(80f, 28f);
+            distRect.anchoredPosition = new Vector2(-16f, -16f);
+            distRect.sizeDelta = new Vector2(84f, 30f);
+            Image distBg = distObj.GetComponent<Image>();
+            ApplyRoundedSurface(distBg, GetNavigationChipRoundedSprite(), new Color(1f, 0.63f, 0.28f, 0.96f));
 
-            TextMeshProUGUI distTmp = distObj.GetComponent<TextMeshProUGUI>();
+            TextMeshProUGUI distTmp = CreateHUDText("DistanceText", distObj.transform,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero,
+                distanceStr, 15f, FontStyles.Bold, TextAlignmentOptions.Center);
             distTmp.text = distanceStr;
-            distTmp.fontSize = 20f;
-            distTmp.fontStyle = FontStyles.Bold;
-            distTmp.color = new Color(0.08f, 0.78f, 0.96f, 1f);
-            distTmp.alignment = TextAlignmentOptions.MidlineRight;
-            ApplySharedTextStyle(distTmp);
+            distTmp.color = new Color(0.17f, 0.12f, 0.08f, 1f);
         }
+
+        GameObject hintObj = new GameObject("HintText", typeof(RectTransform), typeof(TextMeshProUGUI));
+        hintObj.transform.SetParent(itemObj.transform, false);
+        RectTransform hintRect = hintObj.GetComponent<RectTransform>();
+        hintRect.anchorMin = new Vector2(0f, 0f);
+        hintRect.anchorMax = new Vector2(1f, 0f);
+        hintRect.offsetMin = new Vector2(30f, 16f);
+        hintRect.offsetMax = new Vector2(-24f, 38f);
+
+        TextMeshProUGUI hintTmp = hintObj.GetComponent<TextMeshProUGUI>();
+        hintTmp.text = "탭하면 바로 AR 길안내를 시작합니다";
+        hintTmp.fontSize = 14f;
+        hintTmp.fontStyle = FontStyles.Normal;
+        hintTmp.alignment = TextAlignmentOptions.MidlineLeft;
+        hintTmp.textWrappingMode = TextWrappingModes.NoWrap;
+        hintTmp.overflowMode = TextOverflowModes.Ellipsis;
+        hintTmp.raycastTarget = false;
+        ApplySharedTextStyle(hintTmp);
+        hintTmp.color = new Color(0.53f, 0.83f, 0.9f, 0.88f);
 
         return itemObj;
     }
@@ -609,6 +848,7 @@ public partial class ARUIManager : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
+        tmp.raycastTarget = false;
         ApplySharedTextStyle(tmp);
         return tmp;
     }
@@ -628,7 +868,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         if (navigationHUD != null) return;
 
-        // HUD 루트 패널 (화면 상단)
+        // HUD 루트 패널
         navigationHUD = new GameObject("NavigationHUD", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
         navigationHUD.transform.SetParent(transform, false);
 
@@ -637,59 +877,149 @@ public partial class ARUIManager : MonoBehaviour
         hudRect.anchorMax = new Vector2(1f, 1f);
         hudRect.pivot = new Vector2(0.5f, 1f);
         hudRect.anchoredPosition = new Vector2(0f, 0f);
-        hudRect.sizeDelta = new Vector2(0f, 220f);
+        hudRect.sizeDelta = new Vector2(0f, 364f);
 
-        Image hudBg = navigationHUD.GetComponent<Image>();
-        hudBg.color = new Color(0.02f, 0.06f, 0.12f, 0.92f);
+        Image hudRootBg = navigationHUD.GetComponent<Image>();
+        hudRootBg.color = new Color(0f, 0f, 0f, 0.001f);
 
-        // 턴 아이콘 (좌측 원형)
-        GameObject iconObj = new GameObject("TurnIcon", typeof(RectTransform), typeof(TextMeshProUGUI));
-        iconObj.transform.SetParent(navigationHUD.transform, false);
-        RectTransform iconRect = iconObj.GetComponent<RectTransform>();
-        iconRect.anchorMin = new Vector2(0f, 1f);
-        iconRect.anchorMax = new Vector2(0f, 1f);
-        iconRect.pivot = new Vector2(0f, 1f);
-        iconRect.anchoredPosition = new Vector2(20f, -20f);
-        iconRect.sizeDelta = new Vector2(72f, 72f);
-        _turnIconText = iconObj.GetComponent<TextMeshProUGUI>();
-        _turnIconText.text = "↑";
-        _turnIconText.fontSize = 56f;
-        _turnIconText.fontStyle = FontStyles.Bold;
-        _turnIconText.alignment = TextAlignmentOptions.Center;
-        _turnIconText.color = new Color(0.08f, 0.78f, 0.96f, 1f);
-        ApplySharedTextStyle(_turnIconText);
+        GameObject cardObj = new GameObject("NavigationCard", typeof(RectTransform), typeof(Image));
+        cardObj.transform.SetParent(navigationHUD.transform, false);
+        RectTransform cardRect = cardObj.GetComponent<RectTransform>();
+        cardRect.anchorMin = new Vector2(0f, 1f);
+        cardRect.anchorMax = new Vector2(1f, 1f);
+        cardRect.pivot = new Vector2(0.5f, 1f);
+        cardRect.anchoredPosition = new Vector2(0f, -18f);
+        cardRect.sizeDelta = new Vector2(-24f, 340f);
 
-        // 남은 거리 텍스트 (턴 아이콘 오른쪽)
-        remainingDistanceText = CreateHUDText("RemainingDistance", navigationHUD.transform,
+        Image cardBg = cardObj.GetComponent<Image>();
+        ApplyRoundedSurface(cardBg, GetNavigationPanelRoundedSprite(), new Color(0.06f, 0.11f, 0.17f, 0.97f));
+
+        GameObject cardAccent = new GameObject("CardAccent", typeof(RectTransform), typeof(Image));
+        cardAccent.transform.SetParent(cardObj.transform, false);
+        RectTransform cardAccentRect = cardAccent.GetComponent<RectTransform>();
+        cardAccentRect.anchorMin = new Vector2(0f, 1f);
+        cardAccentRect.anchorMax = new Vector2(1f, 1f);
+        cardAccentRect.pivot = new Vector2(0.5f, 1f);
+        cardAccentRect.anchoredPosition = new Vector2(0f, -10f);
+        cardAccentRect.sizeDelta = new Vector2(-36f, 6f);
+        Image cardAccentImage = cardAccent.GetComponent<Image>();
+        ApplyRoundedSurface(cardAccentImage, GetNavigationChipRoundedSprite(), new Color(0.28f, 0.77f, 0.84f, 0.9f));
+
+        // 턴 아이콘 배지
+        GameObject iconBadge = new GameObject("TurnIconBadge", typeof(RectTransform), typeof(Image));
+        iconBadge.transform.SetParent(cardObj.transform, false);
+        RectTransform iconBadgeRect = iconBadge.GetComponent<RectTransform>();
+        iconBadgeRect.anchorMin = new Vector2(0f, 1f);
+        iconBadgeRect.anchorMax = new Vector2(0f, 1f);
+        iconBadgeRect.pivot = new Vector2(0f, 1f);
+        iconBadgeRect.anchoredPosition = new Vector2(18f, -18f);
+        iconBadgeRect.sizeDelta = new Vector2(88f, 88f);
+        _turnIconBackground = iconBadge.GetComponent<Image>();
+        ApplyRoundedSurface(_turnIconBackground, GetNavigationPanelRoundedSprite(), new Color(0.12f, 0.28f, 0.34f, 0.98f));
+
+        GameObject glyphObj = new GameObject("TurnGlyph", typeof(RectTransform), typeof(NavigationGlyphGraphic));
+        glyphObj.transform.SetParent(iconBadge.transform, false);
+        RectTransform glyphRect = glyphObj.GetComponent<RectTransform>();
+        glyphRect.anchorMin = Vector2.zero;
+        glyphRect.anchorMax = Vector2.one;
+        glyphRect.offsetMin = new Vector2(18f, 18f);
+        glyphRect.offsetMax = new Vector2(-18f, -18f);
+        _turnIconGraphic = glyphObj.GetComponent<NavigationGlyphGraphic>();
+        _turnIconGraphic.color = new Color(0.86f, 0.98f, 1f, 1f);
+        _turnIconGraphic.SetGlyph(NavigationGlyphGraphic.GlyphKind.Straight);
+
+        GameObject destinationChip = new GameObject("DestinationChip", typeof(RectTransform), typeof(Image));
+        destinationChip.transform.SetParent(cardObj.transform, false);
+        RectTransform destinationChipRect = destinationChip.GetComponent<RectTransform>();
+        destinationChipRect.anchorMin = new Vector2(0f, 1f);
+        destinationChipRect.anchorMax = new Vector2(1f, 1f);
+        destinationChipRect.pivot = new Vector2(0f, 1f);
+        destinationChipRect.anchoredPosition = new Vector2(118f, -18f);
+        destinationChipRect.sizeDelta = new Vector2(-308f, 30f);
+        Image destinationChipBg = destinationChip.GetComponent<Image>();
+        ApplyRoundedSurface(destinationChipBg, GetNavigationChipRoundedSprite(), new Color(0.11f, 0.18f, 0.24f, 0.96f));
+
+        _destinationTitleText = CreateHUDText("DestinationTitle", destinationChip.transform,
+            Vector2.zero, Vector2.one, new Vector2(0f, 0.5f),
+            new Vector2(14f, 0f), new Vector2(-28f, 0f),
+            string.IsNullOrWhiteSpace(_currentNavigationDestination) ? "선택한 목적지" : _currentNavigationDestination,
+            16f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+        _destinationTitleText.color = new Color(0.94f, 0.98f, 1f, 1f);
+
+        GameObject turnTypeChip = new GameObject("TurnTypeChip", typeof(RectTransform), typeof(Image));
+        turnTypeChip.transform.SetParent(cardObj.transform, false);
+        RectTransform turnTypeChipRect = turnTypeChip.GetComponent<RectTransform>();
+        turnTypeChipRect.anchorMin = new Vector2(0f, 1f);
+        turnTypeChipRect.anchorMax = new Vector2(0f, 1f);
+        turnTypeChipRect.pivot = new Vector2(0f, 1f);
+        turnTypeChipRect.anchoredPosition = new Vector2(118f, -56f);
+        turnTypeChipRect.sizeDelta = new Vector2(110f, 28f);
+        Image turnTypeChipBg = turnTypeChip.GetComponent<Image>();
+        ApplyRoundedSurface(turnTypeChipBg, GetNavigationChipRoundedSprite(), new Color(0.18f, 0.5f, 0.58f, 0.94f));
+
+        _turnTypeText = CreateHUDText("TurnTypeText", turnTypeChip.transform,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero,
+            "직진", 14f, FontStyles.Bold, TextAlignmentOptions.Center);
+        _turnTypeText.color = new Color(0.95f, 0.99f, 1f, 1f);
+
+        // 트래킹 경고 배지
+        _trackingWarningBadge = new GameObject("TrackingWarning", typeof(RectTransform), typeof(Image));
+        _trackingWarningBadge.transform.SetParent(cardObj.transform, false);
+        RectTransform warningRect = _trackingWarningBadge.GetComponent<RectTransform>();
+        warningRect.anchorMin = new Vector2(1f, 1f);
+        warningRect.anchorMax = new Vector2(1f, 1f);
+        warningRect.pivot = new Vector2(1f, 1f);
+        warningRect.anchoredPosition = new Vector2(-18f, -18f);
+        warningRect.sizeDelta = new Vector2(134f, 28f);
+        Image warningBg = _trackingWarningBadge.GetComponent<Image>();
+        ApplyRoundedSurface(warningBg, GetNavigationChipRoundedSprite(), new Color(0.9f, 0.42f, 0.18f, 0.96f));
+        _trackingWarningText = CreateHUDText("TrackingWarningText", _trackingWarningBadge.transform,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero,
+            "위치 정확도 낮음", 13f, FontStyles.Bold, TextAlignmentOptions.Center);
+        _trackingWarningText.color = new Color(1f, 0.97f, 0.92f, 1f);
+        _trackingWarningBadge.SetActive(false);
+
+        remainingDistanceText = CreateHUDText("RemainingDistance", cardObj.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(46f, -34f), new Vector2(-24f, 44f),
-            "경로 계산 중...", 30f, FontStyles.Bold, TextAlignmentOptions.Center);
+            new Vector2(0f, -104f), new Vector2(-34f, 54f),
+            "경로 계산 중...", 36f, FontStyles.Bold, TextAlignmentOptions.Center);
+        remainingDistanceText.color = Color.white;
+
+        _distanceCaptionText = CreateHUDText("DistanceCaption", cardObj.transform,
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -162f), new Vector2(-34f, 18f),
+            "목적지까지 남은 거리", 14f, FontStyles.Normal, TextAlignmentOptions.Center);
+        _distanceCaptionText.color = new Color(0.72f, 0.82f, 0.9f, 0.92f);
 
         // ETA 텍스트
-        _etaText = CreateHUDText("ETA", navigationHUD.transform,
+        _etaText = CreateHUDText("ETA", cardObj.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(46f, -76f), new Vector2(-24f, 28f),
-            "", 20f, FontStyles.Normal, TextAlignmentOptions.Center);
-        _etaText.color = new Color(0.75f, 0.85f, 0.95f, 0.9f);
+            new Vector2(0f, -186f), new Vector2(-40f, 22f),
+            "", 17f, FontStyles.Normal, TextAlignmentOptions.Center);
+        _etaText.color = new Color(0.78f, 0.87f, 0.94f, 0.96f);
 
         // 다음 안내 텍스트
-        nextGuideText = CreateHUDText("NextGuide", navigationHUD.transform,
+        nextGuideText = CreateHUDText("NextGuide", cardObj.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -110f), new Vector2(-24f, 32f),
-            "", 20f, FontStyles.Normal, TextAlignmentOptions.Center);
-        nextGuideText.color = new Color(0.7f, 0.85f, 1f, 0.9f);
+            new Vector2(0f, -214f), new Vector2(-40f, 44f),
+            "안내를 준비하고 있어요", 18f, FontStyles.Normal, TextAlignmentOptions.Center);
+        nextGuideText.color = new Color(0.9f, 0.97f, 1f, 1f);
+        nextGuideText.textWrappingMode = TextWrappingModes.Normal;
+        nextGuideText.overflowMode = TextOverflowModes.Overflow;
 
         // 진행률 바 (배경)
         GameObject progressBg = new GameObject("ProgressBg", typeof(RectTransform), typeof(Image));
-        progressBg.transform.SetParent(navigationHUD.transform, false);
+        progressBg.transform.SetParent(cardObj.transform, false);
         RectTransform pbgRect = progressBg.GetComponent<RectTransform>();
-        pbgRect.anchorMin = new Vector2(0f, 1f);
-        pbgRect.anchorMax = new Vector2(1f, 1f);
-        pbgRect.pivot = new Vector2(0.5f, 1f);
-        pbgRect.anchoredPosition = new Vector2(0f, -150f);
-        pbgRect.sizeDelta = new Vector2(-40f, 6f);
+        pbgRect.anchorMin = new Vector2(0f, 0f);
+        pbgRect.anchorMax = new Vector2(1f, 0f);
+        pbgRect.pivot = new Vector2(0.5f, 0f);
+        pbgRect.anchoredPosition = new Vector2(0f, 62f);
+        pbgRect.sizeDelta = new Vector2(-36f, 8f);
         Image pbgImg = progressBg.GetComponent<Image>();
-        pbgImg.color = new Color(0.2f, 0.24f, 0.3f, 1f);
+        ApplyRoundedSurface(pbgImg, GetNavigationChipRoundedSprite(), new Color(0.14f, 0.19f, 0.25f, 1f));
 
         // 진행률 바 (채움)
         GameObject progressFillObj = new GameObject("ProgressFill", typeof(RectTransform), typeof(Image));
@@ -700,72 +1030,81 @@ public partial class ARUIManager : MonoBehaviour
         pfRect.offsetMin = Vector2.zero;
         pfRect.offsetMax = Vector2.zero;
         _progressFill = progressFillObj.GetComponent<Image>();
-        _progressFill.color = new Color(0.08f, 0.78f, 0.96f, 1f);
+        ApplyRoundedSurface(_progressFill, GetNavigationChipRoundedSprite(), new Color(0.28f, 0.77f, 0.84f, 1f));
         _progressFill.type = Image.Type.Filled;
         _progressFill.fillMethod = Image.FillMethod.Horizontal;
         _progressFill.fillOrigin = 0;
         _progressFill.fillAmount = 0f;
 
         // 중지 버튼 (하단 오른쪽)
-        stopNavigationButton = CreatePanelButton("StopNavBtn", navigationHUD.transform, "안내 중지",
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(80f, 16f), new Vector2(140f, 44f),
-            new Color(0.85f, 0.2f, 0.15f, 1f));
+        stopNavigationButton = CreatePanelButton("StopNavBtn", cardObj.transform, "안내 종료",
+            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+            new Vector2(-18f, 16f), new Vector2(118f, 42f),
+            new Color(0.89f, 0.36f, 0.24f, 1f));
         BindStopNavigationButton();
 
         // 화면 보정 버튼 (하단 왼쪽 - drift 발생 시 현재 카메라 위치 기준으로 화살표 재정렬)
-        recalibrateButton = CreatePanelButton("RecalibrateBtn", navigationHUD.transform, "화면 보정",
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(-80f, 16f), new Vector2(140f, 44f),
-            new Color(0.08f, 0.78f, 0.96f, 1f));
+        recalibrateButton = CreatePanelButton("RecalibrateBtn", cardObj.transform, "화면 보정",
+            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(18f, 16f), new Vector2(118f, 42f),
+            new Color(0.18f, 0.69f, 0.78f, 1f));
         BindRecalibrateButton();
 
-        // 트래킹 경고 배지 (GPS 신호 약함)
-        _trackingWarningBadge = new GameObject("TrackingWarning", typeof(RectTransform), typeof(Image));
-        _trackingWarningBadge.transform.SetParent(navigationHUD.transform, false);
-        RectTransform twRect = _trackingWarningBadge.GetComponent<RectTransform>();
-        twRect.anchorMin = new Vector2(1f, 1f);
-        twRect.anchorMax = new Vector2(1f, 1f);
-        twRect.pivot = new Vector2(1f, 1f);
-        twRect.anchoredPosition = new Vector2(-16f, -16f);
-        twRect.sizeDelta = new Vector2(16f, 16f);
-        Image twImg = _trackingWarningBadge.GetComponent<Image>();
-        twImg.color = new Color(0.95f, 0.25f, 0.15f, 1f);
-        _trackingWarningBadge.SetActive(false);
-
         // 리루트 인디케이터
-        _reroutingIndicator = new GameObject("ReroutingIndicator", typeof(RectTransform), typeof(TextMeshProUGUI));
-        _reroutingIndicator.transform.SetParent(navigationHUD.transform, false);
+        _reroutingIndicator = new GameObject("ReroutingIndicator", typeof(RectTransform), typeof(Image));
+        _reroutingIndicator.transform.SetParent(cardObj.transform, false);
         RectTransform riRect = _reroutingIndicator.GetComponent<RectTransform>();
-        riRect.anchorMin = new Vector2(0.5f, 0f);
-        riRect.anchorMax = new Vector2(0.5f, 0f);
-        riRect.pivot = new Vector2(0.5f, 0f);
-        riRect.anchoredPosition = new Vector2(0f, 68f);
-        riRect.sizeDelta = new Vector2(260f, 28f);
-        TextMeshProUGUI riTmp = _reroutingIndicator.GetComponent<TextMeshProUGUI>();
-        riTmp.text = "경로 재탐색 중...";
-        riTmp.fontSize = 18f;
-        riTmp.fontStyle = FontStyles.Bold;
-        riTmp.alignment = TextAlignmentOptions.Center;
-        riTmp.color = new Color(1f, 0.8f, 0.2f, 1f);
-        ApplySharedTextStyle(riTmp);
+        riRect.anchorMin = new Vector2(0.5f, 1f);
+        riRect.anchorMax = new Vector2(0.5f, 1f);
+        riRect.pivot = new Vector2(0.5f, 1f);
+        riRect.anchoredPosition = new Vector2(0f, -92f);
+        riRect.sizeDelta = new Vector2(196f, 30f);
+        Image reroutingBg = _reroutingIndicator.GetComponent<Image>();
+        ApplyRoundedSurface(reroutingBg, GetNavigationChipRoundedSprite(), new Color(0.97f, 0.71f, 0.22f, 0.96f));
+        _reroutingText = CreateHUDText("ReroutingText", _reroutingIndicator.transform,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero,
+            "경로 재탐색 중", 14f, FontStyles.Bold, TextAlignmentOptions.Center);
+        _reroutingText.color = new Color(0.28f, 0.16f, 0.04f, 1f);
         _reroutingIndicator.SetActive(false);
 
         // 화면 밖 방향 표시 인디케이터
         if (offScreenIndicator == null)
         {
-            GameObject indicatorObj = new GameObject("OffScreenIndicator", typeof(RectTransform), typeof(TextMeshProUGUI));
+            GameObject indicatorObj = new GameObject("OffScreenIndicator", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
             indicatorObj.transform.SetParent(transform, false);
             offScreenIndicator = indicatorObj.GetComponent<RectTransform>();
-            offScreenIndicator.sizeDelta = new Vector2(60f, 60f);
+            offScreenIndicator.sizeDelta = new Vector2(84f, 84f);
 
-            TextMeshProUGUI indicatorText = indicatorObj.GetComponent<TextMeshProUGUI>();
-            indicatorText.text = "V";
-            indicatorText.fontSize = 40f;
-            indicatorText.fontStyle = FontStyles.Bold;
-            indicatorText.alignment = TextAlignmentOptions.Center;
-            indicatorText.color = new Color(0.08f, 0.78f, 0.96f, 0.9f);
-            ApplySharedTextStyle(indicatorText);
+            Image indicatorBg = indicatorObj.GetComponent<Image>();
+            ApplyRoundedSurface(indicatorBg, GetNavigationPanelRoundedSprite(), new Color(0.05f, 0.12f, 0.18f, 0.95f));
+            indicatorBg.raycastTarget = false;
+
+            GameObject indicatorArrowObj = new GameObject("Arrow", typeof(RectTransform));
+            indicatorArrowObj.transform.SetParent(offScreenIndicator, false);
+            _offScreenArrowRoot = indicatorArrowObj.GetComponent<RectTransform>();
+            _offScreenArrowRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _offScreenArrowRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _offScreenArrowRoot.pivot = new Vector2(0.5f, 0.5f);
+            _offScreenArrowRoot.anchoredPosition = new Vector2(0f, 8f);
+            _offScreenArrowRoot.sizeDelta = new Vector2(32f, 32f);
+
+            GameObject indicatorGlyphObj = new GameObject("Glyph", typeof(RectTransform), typeof(NavigationGlyphGraphic));
+            indicatorGlyphObj.transform.SetParent(_offScreenArrowRoot, false);
+            RectTransform indicatorGlyphRect = indicatorGlyphObj.GetComponent<RectTransform>();
+            indicatorGlyphRect.anchorMin = Vector2.zero;
+            indicatorGlyphRect.anchorMax = Vector2.one;
+            indicatorGlyphRect.offsetMin = Vector2.zero;
+            indicatorGlyphRect.offsetMax = Vector2.zero;
+            _offScreenIndicatorGraphic = indicatorGlyphObj.GetComponent<NavigationGlyphGraphic>();
+            _offScreenIndicatorGraphic.color = new Color(0.88f, 0.98f, 1f, 1f);
+            _offScreenIndicatorGraphic.SetGlyph(NavigationGlyphGraphic.GlyphKind.Straight);
+
+            _offScreenIndicatorText = CreateHUDText("OffScreenLabel", offScreenIndicator,
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 10f), new Vector2(56f, 18f),
+                "경로", 12f, FontStyles.Bold, TextAlignmentOptions.Center);
+            _offScreenIndicatorText.color = new Color(0.78f, 0.9f, 0.97f, 0.98f);
             indicatorObj.SetActive(false);
         }
 
@@ -796,6 +1135,7 @@ public partial class ARUIManager : MonoBehaviour
         tmp.color = Color.white;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
+        tmp.raycastTarget = false;
         ApplySharedTextStyle(tmp);
         return tmp;
     }
@@ -806,6 +1146,7 @@ public partial class ARUIManager : MonoBehaviour
         EnsureNavigationHUD();
         navigationHUD.SetActive(true);
         BringNavigationSurfaceToFront(navigationHUD.transform);
+        RefreshToastLayout(true);
     }
 
     // 내비 HUD와 관련 인디케이터를 모두 숨기고 애니메이션을 정리한다.
@@ -820,6 +1161,22 @@ public partial class ARUIManager : MonoBehaviour
             StopCoroutine(_reroutingAnimRoutine);
             _reroutingAnimRoutine = null;
         }
+        RefreshToastLayout(true);
+    }
+
+    // 현재 길안내 중인 목적지명을 HUD에 반영한다.
+    public void SetNavigationDestination(string destinationName)
+    {
+        _currentNavigationDestination = string.IsNullOrWhiteSpace(destinationName)
+            ? string.Empty
+            : destinationName.Trim();
+
+        if (_destinationTitleText != null)
+        {
+            _destinationTitleText.text = string.IsNullOrWhiteSpace(_currentNavigationDestination)
+                ? "선택한 목적지"
+                : _currentNavigationDestination;
+        }
     }
 
     // 남은 총 거리를 HUD 상단 문구 형식으로 갱신한다.
@@ -827,10 +1184,14 @@ public partial class ARUIManager : MonoBehaviour
     {
         EnsureNavigationHUD();
         if (remainingDistanceText == null) return;
-        if (meters >= 1000f)
-            remainingDistanceText.text = $"약 {meters / 1000f:F1}km";
-        else
-            remainingDistanceText.text = $"약 {Mathf.RoundToInt(meters)}m";
+        remainingDistanceText.text = FormatCompactDistance(meters);
+
+        if (_distanceCaptionText != null)
+        {
+            _distanceCaptionText.text = meters <= 25f
+                ? "거의 도착했어요"
+                : "목적지까지 남은 거리";
+        }
     }
 
     // 방향 타입 없이 다음 안내 문구만 갱신하는 편의 오버로드다.
@@ -843,57 +1204,174 @@ public partial class ARUIManager : MonoBehaviour
     public void UpdateNextGuide(string guidance, float distance, int guideType)
     {
         EnsureNavigationHUD();
+        string normalizedGuidance = string.IsNullOrWhiteSpace(guidance) ? string.Empty : guidance.Trim();
+
         if (nextGuideText != null)
         {
-            if (string.IsNullOrWhiteSpace(guidance))
+            if (string.IsNullOrWhiteSpace(normalizedGuidance))
             {
-                nextGuideText.text = "";
+                nextGuideText.text = "화살표를 따라 천천히 이동해 주세요";
             }
             else if (distance > 0f)
             {
-                nextGuideText.text = $"{Mathf.RoundToInt(distance)}m 후 {guidance}";
+                nextGuideText.text = $"{FormatCompactDistance(distance)} 뒤 {normalizedGuidance}";
             }
             else
             {
-                nextGuideText.text = guidance;
+                nextGuideText.text = normalizedGuidance;
             }
         }
 
-        if (_turnIconText != null)
+        if (_turnTypeText != null)
         {
-            _turnIconText.text = GetTurnSymbol(guideType);
+            _turnTypeText.text = GetTurnLabel(guideType);
+        }
+
+        if (_turnIconGraphic != null)
+        {
+            _turnIconGraphic.SetGlyph(GetTurnGlyphKind(guideType));
+            _turnIconGraphic.color = GetTurnAccentColor(guideType);
+        }
+
+        if (_turnIconBackground != null)
+        {
+            _turnIconBackground.color = Color.Lerp(
+                new Color(0.08f, 0.14f, 0.18f, 0.98f),
+                GetTurnAccentColor(guideType),
+                0.24f
+            );
         }
     }
 
-    // TMAP 보행자 길찾기 turnType → 심볼 매핑
-    // TMAP turnType 값을 화면용 방향 심볼로 변환한다.
-    string GetTurnSymbol(int type)
+    // HUD와 검색 패널에서 공통으로 쓰는 짧은 거리 문자열을 만든다.
+    string FormatCompactDistance(float meters)
+    {
+        if (meters <= 0f)
+        {
+            return "0m";
+        }
+
+        if (meters >= 1000f)
+        {
+            return $"{meters / 1000f:F1}km";
+        }
+
+        return $"{Mathf.Max(1, Mathf.RoundToInt(meters))}m";
+    }
+
+    // turnType을 사용자용 짧은 안내 라벨로 변환한다.
+    string GetTurnLabel(int type)
     {
         switch (type)
         {
-            case 11: return "↑";  // 직진
-            case 12: return "↖";  // 좌회전
-            case 13: return "↗";  // 우회전
-            case 14: return "↺";  // U턴
-            case 16: return "↰";  // 8시 좌회전
-            case 17: return "↖";  // 10시 좌회전
-            case 18: return "↗";  // 2시 우회전
-            case 19: return "↳";  // 4시 우회전
-            case 125: return "⌒"; // 육교
-            case 126: return "▼"; // 지하보도
-            case 127: return "⊓"; // 계단
-            case 128: return "⁄"; // 경사로
-            case 200: return "↑"; // 출발
-            case 201: return "●"; // 도착
-            case 211: // 횡단보도
+            case 12:
+            case 16:
+            case 17:
+                return "좌회전";
+            case 13:
+            case 18:
+            case 19:
+                return "우회전";
+            case 14:
+                return "U턴";
+            case 125:
+                return "육교";
+            case 126:
+                return "지하보도";
+            case 127:
+                return "계단";
+            case 128:
+                return "경사로";
+            case 201:
+                return "도착";
+            case 211:
             case 212:
             case 213:
             case 214:
             case 215:
             case 216:
-            case 217: return "⊞"; // 횡단보도
-            case 218: return "⊡"; // 엘리베이터
-            default: return "↑";
+            case 217:
+                return "횡단보도";
+            case 218:
+                return "엘리베이터";
+            default:
+                return "직진";
+        }
+    }
+
+    // turnType을 벡터 아이콘 종류로 변환한다.
+    NavigationGlyphGraphic.GlyphKind GetTurnGlyphKind(int type)
+    {
+        switch (type)
+        {
+            case 12:
+            case 17:
+                return NavigationGlyphGraphic.GlyphKind.TurnLeft;
+            case 13:
+            case 19:
+                return NavigationGlyphGraphic.GlyphKind.TurnRight;
+            case 16:
+                return NavigationGlyphGraphic.GlyphKind.SlightLeft;
+            case 18:
+                return NavigationGlyphGraphic.GlyphKind.SlightRight;
+            case 14:
+                return NavigationGlyphGraphic.GlyphKind.UTurn;
+            case 125:
+                return NavigationGlyphGraphic.GlyphKind.Bridge;
+            case 126:
+                return NavigationGlyphGraphic.GlyphKind.Underpass;
+            case 127:
+                return NavigationGlyphGraphic.GlyphKind.Stairs;
+            case 128:
+                return NavigationGlyphGraphic.GlyphKind.Ramp;
+            case 201:
+                return NavigationGlyphGraphic.GlyphKind.Arrival;
+            case 211:
+            case 212:
+            case 213:
+            case 214:
+            case 215:
+            case 216:
+            case 217:
+                return NavigationGlyphGraphic.GlyphKind.Crosswalk;
+            case 218:
+                return NavigationGlyphGraphic.GlyphKind.Elevator;
+            default:
+                return NavigationGlyphGraphic.GlyphKind.Straight;
+        }
+    }
+
+    // 안내 종류별 강조색을 정해 직관적인 상태 변화를 만든다.
+    Color GetTurnAccentColor(int type)
+    {
+        switch (type)
+        {
+            case 12:
+            case 13:
+            case 14:
+            case 16:
+            case 17:
+            case 18:
+            case 19:
+                return new Color(1f, 0.7f, 0.32f, 1f);
+            case 125:
+            case 126:
+            case 127:
+            case 128:
+            case 218:
+                return new Color(0.82f, 0.9f, 0.56f, 1f);
+            case 201:
+                return new Color(1f, 0.54f, 0.36f, 1f);
+            case 211:
+            case 212:
+            case 213:
+            case 214:
+            case 215:
+            case 216:
+            case 217:
+                return new Color(0.48f, 0.86f, 0.84f, 1f);
+            default:
+                return new Color(0.84f, 0.97f, 1f, 1f);
         }
     }
 
@@ -910,12 +1388,12 @@ public partial class ARUIManager : MonoBehaviour
         int minutes = Mathf.RoundToInt(remainingSeconds / 60f);
         if (minutes < 1)
         {
-            _etaText.text = "곧 도착";
+            _etaText.text = "곧 도착해요";
         }
         else
         {
             DateTime arrival = DateTime.Now.AddSeconds(remainingSeconds);
-            _etaText.text = $"약 {minutes}분 · {arrival:HH:mm} 도착";
+            _etaText.text = $"{minutes}분 남음 · {arrival:HH:mm} 도착 예정";
         }
     }
 
@@ -932,7 +1410,9 @@ public partial class ARUIManager : MonoBehaviour
     {
         EnsureNavigationHUD();
         if (_trackingWarningBadge != null)
+        {
             _trackingWarningBadge.SetActive(show);
+        }
     }
 
     // 재탐색 인디케이터와 점 애니메이션의 표시 상태를 제어한다.
@@ -948,6 +1428,11 @@ public partial class ARUIManager : MonoBehaviour
         }
         if (show)
         {
+            if (_reroutingText != null)
+            {
+                _reroutingText.text = "경로 재탐색 중";
+            }
+
             _reroutingAnimRoutine = StartCoroutine(AnimateReroutingDots());
         }
     }
@@ -955,7 +1440,7 @@ public partial class ARUIManager : MonoBehaviour
     // 재탐색 문구 뒤의 점 개수를 순환시켜 진행 중 느낌을 만든다.
     IEnumerator AnimateReroutingDots()
     {
-        TextMeshProUGUI tmp = _reroutingIndicator != null ? _reroutingIndicator.GetComponent<TextMeshProUGUI>() : null;
+        TextMeshProUGUI tmp = _reroutingText;
         if (tmp == null) yield break;
         int dotCount = 0;
         while (_reroutingIndicator != null && _reroutingIndicator.activeSelf)
@@ -1013,7 +1498,15 @@ public partial class ARUIManager : MonoBehaviour
         offScreenIndicator.anchoredPosition = localPoint;
 
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        offScreenIndicator.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
+        if (_offScreenArrowRoot != null)
+        {
+            _offScreenArrowRoot.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
+        }
+
+        if (_offScreenIndicatorText != null)
+        {
+            _offScreenIndicatorText.text = screenPoint.z < 0f ? "뒤쪽" : "경로";
+        }
     }
 
     // 메인 길찾기 버튼이 없으면 생성하고 NavigationManager 존재도 보장한다.
@@ -1326,6 +1819,7 @@ public partial class ARUIManager : MonoBehaviour
 
         _lastScreenWidth = Screen.width;
         _lastScreenHeight = Screen.height;
+        RefreshToastLayout();
 
         bool isLandscapeLike = Screen.width > Screen.height;
         EnsureBottomActionBarToolkit();
@@ -1450,6 +1944,7 @@ public partial class ARUIManager : MonoBehaviour
         HideCard(scanningCard, _scanRect, _scanGroup, ref _scanRoutine);
         HideCard(detectedCard, _detectRect, _detectGroup, ref _detectRoutine);
         SetStatusBadgeMessage(null);
+        ForceHideStatusBadge();
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(false);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(false);
         if (landscapeModeButton != null) landscapeModeButton.gameObject.SetActive(false);
@@ -1466,6 +1961,7 @@ public partial class ARUIManager : MonoBehaviour
         {
             BringNavigationSurfaceToFront(navigationHUD.transform);
         }
+        RefreshToastLayout(true);
     }
 
     // 내비 모드 종료 시 HUD를 정리하고 기본 스캔 상태 UI로 복귀한다.
@@ -1473,6 +1969,7 @@ public partial class ARUIManager : MonoBehaviour
     {
         HideNavigationHUD();
         HideSearchPanel();
+        SetNavigationDestination(string.Empty);
         if (mainNavigateButton != null) mainNavigateButton.gameObject.SetActive(true);
         if (worldInfoDetailButton != null) worldInfoDetailButton.gameObject.SetActive(true);
         _toolkitBottomBarNavigationMode = false;
@@ -1480,6 +1977,7 @@ public partial class ARUIManager : MonoBehaviour
         if (_toolkitNavigateButton != null) _toolkitNavigateButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
         if (_toolkitDetailButton != null) _toolkitDetailButton.style.display = UnityEngine.UIElements.DisplayStyle.Flex;
         RefreshBottomActionBarToolkitLayout();
+        RefreshToastLayout(true);
         SetScanningMode();
     }
 
