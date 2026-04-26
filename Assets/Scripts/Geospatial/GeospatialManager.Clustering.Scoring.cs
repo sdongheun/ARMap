@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+// X
 public partial class GeospatialManager
 {
     List<KakaoDocument> SelectRepresentativeBuildingDocuments(List<KakaoDocument> addressGroup)
@@ -22,22 +23,24 @@ public partial class GeospatialManager
 
     bool IsRepresentativeBuildingCandidate(KakaoDocument document)
     {
-        if (document == null)
-        {
-            return false;
-        }
-
-        if (!LooksLikeAnchorEligibleBuilding(document))
-        {
-            return false;
-        }
-
-        if (GetClusterGroupingType(document) != ClusterGroupingType.Institutional)
-        {
-            return false;
-        }
-
-        return GetRepresentativeBuildingCandidateScore(document) > 0;
+        // 현재는 일반 건물만 사용하므로 기관/병원 대표 후보 판정은 비활성화한다.
+        // if (document == null)
+        // {
+        //     return false;
+        // }
+        //
+        // if (!LooksLikeAnchorEligibleBuilding(document))
+        // {
+        //     return false;
+        // }
+        //
+        // if (GetClusterGroupingType(document) != ClusterGroupingType.Institutional)
+        // {
+        //     return false;
+        // }
+        //
+        // return GetRepresentativeBuildingCandidateScore(document) > 0;
+        return false;
     }
 
     int GetRepresentativeBuildingCandidateScore(KakaoDocument document)

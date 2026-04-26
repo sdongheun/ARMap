@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UITKButton = UnityEngine.UIElements.Button;
 
+// 하단 바 툴킷 관련 기능을 분리한 ARUIManager의 partial 클래스다.
 public partial class ARUIManager
 {
     private const float ToolkitPortraitButtonCornerRadius = 9f;

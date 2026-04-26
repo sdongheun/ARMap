@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
+// 상세정보페이지 연동
 public partial class ARUIManager
 {
     #region Detail View Control
@@ -69,38 +70,36 @@ public partial class ARUIManager
     // 이전 토스트를 중단하고 새 토스트 표시 코루틴을 시작한다.
     public void ShowToast(string message)
     {
-        if (_toastRoutine != null) StopCoroutine(_toastRoutine);
-        _toastRoutine = StartCoroutine(ToastProcess(message));
+        Debug.Log($"[ARUI Toast Disabled] {message}");
+        // if (_toastRoutine != null) StopCoroutine(_toastRoutine);
+        // _toastRoutine = StartCoroutine(ToastProcess(message));
     }
 
     // 토스트를 페이드 인, 유지, 페이드 아웃 순서로 표시한다.
     IEnumerator ToastProcess(string message)
     {
-        if (toastText != null) toastText.text = message;
-        toastPanel.SetActive(true);
-
-        CanvasGroup group = toastPanel.GetComponent<CanvasGroup>();
-        group.alpha = 0f;
-
-        float time = 0f;
-        while (time < 0.2f)
-        {
-            time += Time.deltaTime;
-            group.alpha = Mathf.Lerp(0f, 1f, time / 0.2f);
-            yield return null;
-        }
-        group.alpha = 1f;
-
-        yield return new WaitForSeconds(toastDuration);
-
-        time = 0f;
-        while (time < 0.3f)
-        {
-            time += Time.deltaTime;
-            group.alpha = Mathf.Lerp(1f, 0f, time / 0.3f);
-            yield return null;
-        }
-        toastPanel.SetActive(false);
+        // if (toastText != null) toastText.text = message;
+        // toastPanel.SetActive(true);
+        // CanvasGroup group = toastPanel.GetComponent<CanvasGroup>();
+        // group.alpha = 0f;
+        // float time = 0f;
+        // while (time < 0.2f)
+        // {
+        //     time += Time.deltaTime;
+        //     group.alpha = Mathf.Lerp(0f, 1f, time / 0.2f);
+        //     yield return null;
+        // }
+        // group.alpha = 1f;
+        // yield return new WaitForSeconds(toastDuration);
+        // time = 0f;
+        // while (time < 0.3f)
+        // {
+        //     time += Time.deltaTime;
+        //     group.alpha = Mathf.Lerp(1f, 0f, time / 0.3f);
+        //     yield return null;
+        // }
+        // toastPanel.SetActive(false);
+        yield break;
     }
 
     // 현재 상세 정보의 전화번호로 시스템 전화 앱을 연다.

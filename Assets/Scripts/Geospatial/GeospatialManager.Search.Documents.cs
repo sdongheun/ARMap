@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
 
+
+//검색해서 받아온 KakaoDocument들을 정리하는 후처리 파일
+//여러 검색 결과를 받아서 중복을 제거하고, 더 품질 좋은 문서를 남기고, 주소/문자열 정규화 유틸을 제공하는 파일입니다.
+
+
 public partial class GeospatialManager
 {
     void MergeFetchedPlaces(Dictionary<string, KakaoDocument> mergedPlaces, List<KakaoDocument> fetchedDocuments)

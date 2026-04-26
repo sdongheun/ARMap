@@ -2,6 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using IEnumerator = System.Collections.IEnumerator;
+
+// 상단 상태 배지("주변을 바라보세요", "건물 3개 탐지됨" 등) 관련 기능을 분리한 ARUIManager의 partial 클래스다.
 public partial class ARUIManager
 {
     #region Main Card State Control

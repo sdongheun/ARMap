@@ -5,6 +5,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
+
+//실제로 Kakao Local API 요청을 보내고, 응답 문서를 1차 가공해서 상위 흐름에 넘기는 파일
 public partial class GeospatialManager
 {
     IEnumerator FetchNearbyPlacesFromKakaoCategory(double lat, double lon, string categoryCode, string sourceLabel, int sourcePriority, Action<bool, List<KakaoDocument>> onCompleted)

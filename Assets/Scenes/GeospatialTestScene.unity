@@ -252,7 +252,6 @@ MonoBehaviour:
   animDuration: 0.3
   slideOffset: 150
   statusCardPosY: 0
-  toastPanel: {fileID: 218706655}
   toastText: {fileID: 113327859}
   toastDuration: 2
   navigationSearchPanel: {fileID: 0}
@@ -283,6 +282,8 @@ MonoBehaviour:
   centerReticlePulseScale: 1.04
   statusBadgeSize: {x: 260, y: 48}
   statusBadgeTopOffset: {x: 0, y: -60}
+  bottomActionBarCornerRadius: 14
+  bottomActionBarSpriteSize: 64
 --- !u!114 &104506283
 MonoBehaviour:
   m_ObjectHideFlags: 0

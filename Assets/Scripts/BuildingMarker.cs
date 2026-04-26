@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.Collections.Generic;
 
+
+//그 데이터를 월드에 보여주는 마커 오브젝트
 public class BuildingMarker : MonoBehaviour
 {
     public enum MarkerVisualState

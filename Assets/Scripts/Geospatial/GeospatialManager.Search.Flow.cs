@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+
+//현재 위치를 받아서 여러 Kakao 검색을 돌리고, 결과를 병합하고, 클러스터링하고, 최종 건물 리스트를 만든 뒤 앵커 생성 단계로 넘기는 파일
 public partial class GeospatialManager
 {
     private class SearchDiagnostics
@@ -44,25 +46,26 @@ public partial class GeospatialManager
             }
         }
 
-        if (useCampusCategorySearch)
-        {
-            foreach (string categoryCode in GetCampusCategoryCodes())
-            {
-                bool categorySucceeded = false;
-                diagnostics.campusRequestCount++;
-                yield return StartCoroutine(FetchNearbyPlacesFromKakaoCategory(lat, lon, categoryCode, "campus", 200, (requestSucceeded, fetchedDocuments) =>
-                {
-                    categorySucceeded = requestSucceeded;
-                    diagnostics.campusResultCount += fetchedDocuments.Count;
-                    MergeFetchedPlaces(mergedPlaces, fetchedDocuments);
-                }));
-
-                if (categorySucceeded)
-                {
-                    successCount++;
-                }
-            }
-        }
+        // 현재는 일반 건물만 사용하므로 campus 카테고리 검색은 비활성화한다.
+        // if (useCampusCategorySearch)
+        // {
+        //     foreach (string categoryCode in GetCampusCategoryCodes())
+        //     {
+        //         bool categorySucceeded = false;
+        //         diagnostics.campusRequestCount++;
+        //         yield return StartCoroutine(FetchNearbyPlacesFromKakaoCategory(lat, lon, categoryCode, "campus", 200, (requestSucceeded, fetchedDocuments) =>
+        //         {
+        //             categorySucceeded = requestSucceeded;
+        //             diagnostics.campusResultCount += fetchedDocuments.Count;
+        //             MergeFetchedPlaces(mergedPlaces, fetchedDocuments);
+        //         }));
+        //
+        //         if (categorySucceeded)
+        //         {
+        //             successCount++;
+        //         }
+        //     }
+        // }
 
         if (useKeywordSearch)
         {

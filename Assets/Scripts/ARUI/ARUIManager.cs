@@ -26,10 +26,10 @@ public partial class ARUIManager : MonoBehaviour
     public float statusCardPosY = 0f;
 
     [Header("5. Toast Message")]
-    public GameObject toastPanel;
+    // public GameObject toastPanel; // 현재 미사용
     public TextMeshProUGUI toastText;
     public float toastDuration = 2.0f;
-    private Coroutine _toastRoutine;
+    // private Coroutine _toastRoutine; // 현재 미사용
 
     [Header("6. Navigation UI - 검색 패널")]
     public GameObject navigationSearchPanel;

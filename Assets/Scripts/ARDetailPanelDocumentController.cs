@@ -2,6 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+
+//상세정보페이지 
 [RequireComponent(typeof(UIDocument))]
 public class ARDetailPanelDocumentController : MonoBehaviour
 {
