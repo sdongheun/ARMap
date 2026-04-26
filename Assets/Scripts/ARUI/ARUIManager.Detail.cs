@@ -70,6 +70,7 @@ public partial class ARUIManager
     public void ShowToast(string message)
     {
         if (_toastRoutine != null) StopCoroutine(_toastRoutine);
+        RefreshToastLayout(true);
         _toastRoutine = StartCoroutine(ToastProcess(message));
     }
 
@@ -77,6 +78,7 @@ public partial class ARUIManager
     IEnumerator ToastProcess(string message)
     {
         if (toastText != null) toastText.text = message;
+        RefreshToastLayout(true);
         toastPanel.SetActive(true);
 
         CanvasGroup group = toastPanel.GetComponent<CanvasGroup>();

@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b7b5809501b54a4192277236edcaf88, type: 3}
   m_Name: ARCoreRuntimeSettings
   m_EditorClassIdentifier: Unity.XR.ARCore::UnityEngine.XR.ARCore.ARCoreRuntimeSettings
-  m_EnableCloudAnchors: 0
+  m_EnableCloudAnchors: 1
   m_AuthorizationType: 0
   m_ApiKey: 
