@@ -175,7 +175,7 @@ public partial class ARUIManager
 
             if (_toolkitLandscapeButton != null)
             {
-                _toolkitLandscapeButton.style.display = DisplayStyle.None;
+                _toolkitLandscapeButton.style.display = _toolkitBottomBarNavigationMode ? DisplayStyle.None : DisplayStyle.Flex;
             }
 
             ApplyToolkitButtonSize(_toolkitLandscapeButton, ToolkitLandscapeButtonWidth, ToolkitLandscapeButtonHeight, ToolkitLandscapeButtonFontSize, ToolkitLandscapeButtonCornerRadius);
